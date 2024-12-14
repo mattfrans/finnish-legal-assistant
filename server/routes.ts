@@ -1,14 +1,77 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { db } from "@db/index";
-import { queries } from "@db/schema";
-import { desc } from "drizzle-orm";
+import { chatSessions, queries } from "@db/schema";
+import { desc, eq } from "drizzle-orm";
 
 export function registerRoutes(app: Express): Server {
+  // Create new chat session
+  app.post("/api/sessions", async (req, res) => {
+    try {
+      const title = new Date().toLocaleString('fi-FI');
+      const [session] = await db.insert(chatSessions)
+        .values({ title })
+        .returning();
+      res.json(session);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to create chat session" });
+    }
+  });
+
+  // Get all chat sessions
+  app.get("/api/sessions", async (_req, res) => {
+    try {
+      const sessions = await db.query.chatSessions.findMany({
+        orderBy: [desc(chatSessions.createdAt)],
+        with: {
+          queries: {
+            limit: 1,
+            orderBy: [desc(queries.createdAt)]
+          }
+        }
+      });
+      res.json(sessions);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch chat sessions" });
+    }
+  });
+
+  // Get single chat session with all its messages
+  app.get("/api/sessions/:id", async (req, res) => {
+    try {
+      const session = await db.query.chatSessions.findFirst({
+        where: eq(chatSessions.id, parseInt(req.params.id)),
+        with: {
+          queries: {
+            orderBy: [desc(queries.createdAt)]
+          }
+        }
+      });
+      
+      if (!session) {
+        return res.status(404).json({ error: "Chat session not found" });
+      }
+      
+      res.json(session);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch chat session" });
+    }
+  });
+
   // Chat endpoint
-  app.post("/api/chat", async (req, res) => {
+  app.post("/api/sessions/:id/chat", async (req, res) => {
     try {
       const { question } = req.body;
+      const sessionId = parseInt(req.params.id);
+
+      // Verify session exists
+      const session = await db.query.chatSessions.findFirst({
+        where: eq(chatSessions.id, sessionId)
+      });
+
+      if (!session) {
+        return res.status(404).json({ error: "Chat session not found" });
+      }
 
       // TODO: Integrate with actual Finlex API
       // This is a mock response for now
@@ -24,28 +87,18 @@ export function registerRoutes(app: Express): Server {
       };
 
       // Store in database
-      await db.insert(queries).values({
-        question,
-        answer: mockResponse.answer,
-        sources: mockResponse.sources
-      });
+      const [query] = await db.insert(queries)
+        .values({
+          sessionId,
+          question,
+          answer: mockResponse.answer,
+          sources: mockResponse.sources
+        })
+        .returning();
 
-      res.json(mockResponse);
+      res.json({ ...mockResponse, id: query.id });
     } catch (error) {
-      res.status(500).json({ error: "Internal server error" });
-    }
-  });
-
-  // History endpoint
-  app.get("/api/history", async (_req, res) => {
-    try {
-      const history = await db.query.queries.findMany({
-        orderBy: [desc(queries.createdAt)],
-        limit: 50
-      });
-      res.json(history);
-    } catch (error) {
-      res.status(500).json({ error: "Internal server error" });
+      res.status(500).json({ error: "Failed to process chat message" });
     }
   });
 

@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useState, useEffect } from "react";
+import { useMutation, useQueryClient, useQuery } from "@tanstack/react-query";
 import { MessageBubble } from "./MessageBubble";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -15,12 +15,49 @@ interface Message {
 export function ChatInterface() {
   const [input, setInput] = useState("");
   const [messages, setMessages] = useState<Message[]>([]);
+  const [sessionId, setSessionId] = useState<number | null>(null);
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
+  // Create a new chat session when component mounts
+  const createSession = useMutation({
+    mutationFn: async () => {
+      const res = await fetch("/api/sessions", {
+        method: "POST",
+      });
+      if (!res.ok) throw new Error("Failed to create chat session");
+      return res.json();
+    },
+    onSuccess: (data) => {
+      setSessionId(data.id);
+    },
+  });
+
+  useEffect(() => {
+    createSession.mutate();
+  }, []);
+
+  // Get existing messages if session exists
+  const { data: sessionData } = useQuery({
+    queryKey: [`/api/sessions/${sessionId}`],
+    enabled: sessionId !== null,
+    onSuccess: (data) => {
+      if (data.queries) {
+        setMessages(
+          data.queries.map(q => ([
+            { role: "user", content: q.question },
+            { role: "assistant", content: q.answer, sources: q.sources }
+          ])).flat()
+        );
+      }
+    },
+  });
+
   const mutation = useMutation({
     mutationFn: async (question: string) => {
-      const res = await fetch("/api/chat", {
+      if (!sessionId) throw new Error("No active session");
+      
+      const res = await fetch(`/api/sessions/${sessionId}/chat`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ question }),
@@ -33,7 +70,7 @@ export function ChatInterface() {
       setMessages(prev => [...prev, 
         { role: "assistant", content: data.answer, sources: data.sources }
       ]);
-      queryClient.invalidateQueries({ queryKey: ["/api/history"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/sessions"] });
     },
     onError: () => {
       toast({
