@@ -8,7 +8,7 @@ export function registerRoutes(app: Express): Server {
   // Create new chat session
   app.post("/api/sessions", async (req, res) => {
     try {
-      const title = new Date().toLocaleString('fi-FI');
+      const title = "Uusi keskustelu"; // "New conversation" in Finnish
       const [session] = await db.insert(chatSessions)
         .values({ title })
         .returning();
@@ -73,15 +73,35 @@ export function registerRoutes(app: Express): Server {
         return res.status(404).json({ error: "Chat session not found" });
       }
 
+      // Check if this is the first message in the session
+      const existingQueries = await db.query.queries.findMany({
+        where: eq(queries.sessionId, sessionId)
+      });
+
+      if (existingQueries.length === 0) {
+        // If this is the first message, update the session title
+        const truncatedTitle = question.length > 50 
+          ? question.substring(0, 47) + "..."
+          : question;
+        await db.update(chatSessions)
+          .set({ title: truncatedTitle })
+          .where(eq(chatSessions.id, sessionId));
+      }
+
+      // Enhanced mock response with Finnish legal context
       // TODO: Integrate with actual Finlex API
-      // This is a mock response for now
       const mockResponse = {
-        answer: "According to Finnish law...",
+        answer: "Suomen lain mukaan kuluttajalla on oikeus...", // "According to Finnish law, consumers have the right to..."
         sources: [
           {
-            link: "https://finlex.fi/fi/laki/example",
-            title: "Consumer Protection Act",
-            section: "Chapter 2, Section 1"
+            link: "https://www.finlex.fi/fi/laki/ajantasa/1978/19780038",
+            title: "Kuluttajansuojalaki",
+            section: "2 luku - Markkinointi ja menettelyt asiakassuhteessa"
+          },
+          {
+            link: "https://www.kkv.fi/kuluttaja-asiat/",
+            title: "KKV Kuluttaja-asiat",
+            section: "Kuluttajan oikeudet"
           }
         ]
       };
