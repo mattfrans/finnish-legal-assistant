@@ -43,7 +43,7 @@ export function registerRoutes(app: Express): Server {
         where: eq(chatSessions.id, parseInt(req.params.id)),
         with: {
           queries: {
-            orderBy: [desc(queries.createdAt)]
+            orderBy: [queries.createdAt]
           }
         }
       });
@@ -51,9 +51,19 @@ export function registerRoutes(app: Express): Server {
       if (!session) {
         return res.status(404).json({ error: "Chat session not found" });
       }
+
+      // Ensure the session data includes all necessary fields
+      const fullSession = {
+        ...session,
+        queries: session.queries.map(q => ({
+          ...q,
+          sources: q.sources || []
+        }))
+      };
       
-      res.json(session);
+      res.json(fullSession);
     } catch (error) {
+      console.error('Error fetching chat session:', error);
       res.status(500).json({ error: "Failed to fetch chat session" });
     }
   });

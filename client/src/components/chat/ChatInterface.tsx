@@ -69,13 +69,17 @@ export function ChatInterface({ initialSessionId }: ChatInterfaceProps) {
   // Load messages when session data changes
   useEffect(() => {
     if (sessionData?.queries) {
-      const messageList: Message[] = [];
-      sessionData.queries.forEach((q) => {
-        messageList.push(
-          { role: "user", content: q.question },
-          { role: "assistant", content: q.answer, sources: q.sources }
-        );
-      });
+      // Sort queries by creation date to maintain conversation order
+      const sortedQueries = [...sessionData.queries].sort(
+        (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
+      );
+      
+      // Create message list maintaining conversation order
+      const messageList: Message[] = sortedQueries.flatMap(q => [
+        { role: "user", content: q.question },
+        { role: "assistant", content: q.answer, sources: q.sources }
+      ]);
+      
       setMessages(messageList);
     }
   }, [sessionData]);
