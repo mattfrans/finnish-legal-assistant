@@ -2,9 +2,9 @@ import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Card } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Button } from "@/components/ui/button";
 import { formatDistanceToNow } from "date-fns";
 import { MessageCircle, ChevronRight } from "lucide-react";
+import { ChatInterface } from "@/components/chat/ChatInterface";
 
 interface ChatSession {
   id: number;
@@ -37,32 +37,9 @@ export function History() {
 
   if (selectedSession && sessionDetails) {
     return (
-      <ScrollArea className="h-full p-4">
-        <div className="max-w-4xl mx-auto">
-          <Button
-            variant="ghost"
-            className="mb-4"
-            onClick={() => setSelectedSession(null)}
-          >
-            ← Back to Sessions
-          </Button>
-          
-          <div className="space-y-4">
-            {sessionDetails.queries.map((query) => (
-              <Card key={query.id} className="p-4 space-y-2">
-                <p className="text-sm text-muted-foreground">
-                  {formatDistanceToNow(new Date(query.createdAt), { addSuffix: true })}
-                </p>
-                <p className="font-medium">Q: {query.question}</p>
-                <p>A: {query.answer}</p>
-                {query.sources.length > 0 && (
-                  <div className="text-sm text-muted-foreground">
-                    Sources: {query.sources.map(s => s.title).join(", ")}
-                  </div>
-                )}
-              </Card>
-            ))}
-          </div>
+      <ScrollArea className="h-full">
+        <div className="h-full">
+          <ChatInterface initialSessionId={selectedSession} />
         </div>
       </ScrollArea>
     );
