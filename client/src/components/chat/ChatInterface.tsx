@@ -6,6 +6,19 @@ import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { Send } from "lucide-react";
 
+interface ChatSession {
+  id: number;
+  title: string;
+  createdAt: string;
+  queries: Array<{
+    id: number;
+    question: string;
+    answer: string;
+    sources: Array<{ link: string; title: string; section?: string }>;
+    createdAt: string;
+  }>;
+}
+
 interface Message {
   role: "user" | "assistant";
   content: string;
@@ -38,7 +51,9 @@ export function ChatInterface({ initialSessionId }: ChatInterfaceProps) {
   });
 
   useEffect(() => {
-    if (!initialSessionId) {
+    if (initialSessionId) {
+      setSessionId(initialSessionId);
+    } else {
       createSession.mutate();
     }
   }, [initialSessionId]);
