@@ -1,6 +1,7 @@
-import { pgTable, text, serial, timestamp, json, integer } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, timestamp, json, integer, varchar, pgEnum } from "drizzle-orm/pg-core";
 import { createInsertSchema, createSelectSchema } from "drizzle-zod";
 import { relations } from "drizzle-orm";
+import { sql } from "drizzle-orm";
 
 // Chat sessions table to group related queries
 export const chatSessions = pgTable('chat_sessions', {
@@ -19,11 +20,11 @@ export const queries = pgTable('queries', {
     link: string;
     title: string;
     section?: string;
-    type: 'finlex' | 'kkv' | 'other';
-    identifier?: string;  // For Finlex statute numbers or KKV reference codes
-    relevance: number;    // Relevance score for the citation
+    type?: 'finlex' | 'kkv' | 'other';
+    identifier?: string;
+    relevance: number;
   }>>().default([]).notNull(),
-  legalContext: text('legal_context'),  // Additional context about legal interpretation
+  legalContext: text('legal_context'),
   confidence: json('confidence').$type<{
     score: number;
     reasoning: string;
@@ -43,8 +44,55 @@ export const queriesRelations = relations(queries, ({ one }) => ({
   })
 }));
 
-// Zod schemas for validation
-export const insertChatSessionSchema = createInsertSchema(chatSessions);
-export const selectChatSessionSchema = createSelectSchema(chatSessions);
-export const insertQuerySchema = createInsertSchema(queries);
-export const selectQuerySchema = createSelectSchema(queries);
+// Enum for document types
+export const documentTypeEnum = pgEnum('document_type', ['statute', 'case_law', 'guideline']);
+
+// Table for storing legal documents from Finlex
+export const legalDocuments = pgTable('legal_documents', {
+  id: serial('id').primaryKey(),
+  type: documentTypeEnum('type').notNull(),
+  identifier: varchar('identifier', { length: 50 }).notNull().unique(),
+  title: text('title').notNull(),
+  content: text('content').notNull(),
+  url: text('url').notNull(),
+  publishedAt: timestamp('published_at').notNull(),
+  effectiveFrom: timestamp('effective_from'),
+  effectiveTo: timestamp('effective_to'),
+  metadata: json('metadata').$type<{
+    category?: string;
+    ministry?: string;
+    amendments?: string[];
+  }>(),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull()
+});
+
+// Table for storing document sections with embeddings
+export const documentSections = pgTable('document_sections', {
+  id: serial('id').primaryKey(),
+  documentId: integer('document_id').references(() => legalDocuments.id, { onDelete: 'cascade' }).notNull(),
+  sectionNumber: varchar('section_number', { length: 50 }),
+  title: text('title'),
+  content: text('content').notNull(),
+  embedding: text('embedding').notNull(), // Base64 encoded embedding
+  embedding_vector: text('embedding_vector').notNull(), // Will be converted to vector in migration
+  createdAt: timestamp('created_at').defaultNow().notNull()
+});
+
+// Relations
+export const legalDocumentsRelations = relations(legalDocuments, ({ many }) => ({
+  sections: many(documentSections)
+}));
+
+export const documentSectionsRelations = relations(documentSections, ({ one }) => ({
+  document: one(legalDocuments, {
+    fields: [documentSections.documentId],
+    references: [legalDocuments.id]
+  })
+}));
+
+// Zod schemas
+export const insertLegalDocumentSchema = createInsertSchema(legalDocuments);
+export const selectLegalDocumentSchema = createSelectSchema(legalDocuments);
+export const insertDocumentSectionSchema = createInsertSchema(documentSections);
+export const selectDocumentSectionSchema = createSelectSchema(documentSections);
