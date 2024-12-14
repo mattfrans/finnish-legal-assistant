@@ -66,10 +66,11 @@ export class DocumentProcessor {
       });
 
       // Get the embedding array
-      const vector = Array.from(output.data);
-
+      // Get the embedding array and ensure it's a number array
+      const vector = Array.from(output.data) as number[];
+      
       // Convert to base64 for storage
-      const buffer = Buffer.from(Float32Array.from(vector).buffer);
+      const buffer = Buffer.from(new Float32Array(vector).buffer);
       const embedding = buffer.toString('base64');
 
       console.log(`Generated embedding for text (${text.substring(0, 50)}...)`);
@@ -113,7 +114,7 @@ export class DocumentProcessor {
           title: section.title || null,
           content: section.content,
           embedding,
-          embedding_vector: sql`${JSON.stringify(vector)}::vector`
+          embedding_vector: sql`vector(array[${sql.join(vector.map(v => v.toString()))}])`
         });
       }
 
@@ -167,10 +168,10 @@ export class DocumentProcessor {
         ds.title as section_title,
         ld.title as document_title,
         ld.identifier,
-        1 - (ds.embedding_vector <-> ${vector}::vector) as similarity
+        1 - (ds.embedding_vector <=> vector(array[${vector.map(v => v.toString()).join(',')}])) as similarity
       FROM document_sections ds
       JOIN legal_documents ld ON ds.document_id = ld.id
-      ORDER BY ds.embedding_vector <-> ${vector}::vector
+      ORDER BY ds.embedding_vector <-> array[${vector.join(',')}]::vector(384)
       LIMIT ${limit}
     `);
 
