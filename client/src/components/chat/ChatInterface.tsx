@@ -51,12 +51,14 @@ export function ChatInterface({ initialSessionId }: ChatInterfaceProps) {
   });
 
   useEffect(() => {
-    if (initialSessionId) {
-      setSessionId(initialSessionId);
-    } else {
-      createSession.mutate();
+    if (!sessionId) {
+      if (initialSessionId) {
+        setSessionId(initialSessionId);
+      } else {
+        createSession.mutate();
+      }
     }
-  }, [initialSessionId]);
+  }, [initialSessionId, sessionId]);
 
   // Get existing messages if session exists
   const { data: sessionData } = useQuery<ChatSession>({
@@ -67,12 +69,14 @@ export function ChatInterface({ initialSessionId }: ChatInterfaceProps) {
   // Load messages when session data changes
   useEffect(() => {
     if (sessionData?.queries) {
-      setMessages(
-        sessionData.queries.map(q => ([
+      const messageList: Message[] = [];
+      sessionData.queries.forEach((q) => {
+        messageList.push(
           { role: "user", content: q.question },
           { role: "assistant", content: q.answer, sources: q.sources }
-        ])).flat()
-      );
+        );
+      });
+      setMessages(messageList);
     }
   }, [sessionData]);
 
