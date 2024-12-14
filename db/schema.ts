@@ -19,7 +19,15 @@ export const queries = pgTable('queries', {
     link: string;
     title: string;
     section?: string;
+    type: 'finlex' | 'kkv' | 'other';
+    identifier?: string;  // For Finlex statute numbers or KKV reference codes
+    relevance: number;    // Relevance score for the citation
   }>>().default([]).notNull(),
+  legalContext: text('legal_context'),  // Additional context about legal interpretation
+  confidence: json('confidence').$type<{
+    score: number;
+    reasoning: string;
+  }>(),
   createdAt: timestamp('created_at').defaultNow().notNull()
 });
 

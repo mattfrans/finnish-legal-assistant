@@ -3,6 +3,7 @@ import { createServer, type Server } from "http";
 import { db } from "@db/index";
 import { chatSessions, queries } from "@db/schema";
 import { desc, eq } from "drizzle-orm";
+import { LegalService } from "./services/legal";
 
 export function registerRoutes(app: Express): Server {
   // Create new chat session
@@ -98,35 +99,27 @@ export function registerRoutes(app: Express): Server {
           .where(eq(chatSessions.id, sessionId));
       }
 
-      // Enhanced mock response with Finnish legal context
-      // TODO: Integrate with actual Finlex API
-      const mockResponse = {
-        answer: "Suomen lain mukaan kuluttajalla on oikeus...", // "According to Finnish law, consumers have the right to..."
-        sources: [
-          {
-            link: "https://www.finlex.fi/fi/laki/ajantasa/1978/19780038",
-            title: "Kuluttajansuojalaki",
-            section: "2 luku - Markkinointi ja menettelyt asiakassuhteessa"
-          },
-          {
-            link: "https://www.kkv.fi/kuluttaja-asiat/",
-            title: "KKV Kuluttaja-asiat",
-            section: "Kuluttajan oikeudet"
-          }
-        ]
-      };
+      // Use LegalService to process the query
+      const legalService = new LegalService();
+      const legalResponse = await legalService.analyzeLegalContext(question);
 
-      // Store in database
+      // Store in database with enhanced legal context
       const [query] = await db.insert(queries)
         .values({
           sessionId,
           question,
-          answer: mockResponse.answer,
-          sources: mockResponse.sources
+          answer: legalResponse.answer,
+          sources: legalResponse.sources,
+          legalContext: legalResponse.legalContext,
+          confidence: legalResponse.confidence
         })
         .returning();
 
-      res.json({ ...mockResponse, id: query.id });
+      res.json({ 
+        id: query.id,
+        answer: legalResponse.answer,
+        sources: legalResponse.sources
+      });
     } catch (error) {
       res.status(500).json({ error: "Failed to process chat message" });
     }
