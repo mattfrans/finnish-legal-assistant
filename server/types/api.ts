@@ -42,3 +42,31 @@ export interface ErrorResponse {
   code: string;
   details?: unknown;
 }
+
+export interface ChatSession {
+  id: number;
+  title: string;
+  createdAt: string;
+  queries?: Query[];
+}
+
+export interface Query {
+  id: number;
+  sessionId: number;
+  question: string;
+  answer: string;
+  sources?: Array<{
+    link: string;
+    title: string;
+    section?: string;
+    type?: 'finlex' | 'kkv' | 'other';
+    identifier?: string;
+    relevance: number;
+  }>;
+  legalContext?: string;
+  confidence?: {
+    score: number;
+    reasoning: string;
+  };
+  createdAt: string;
+}
