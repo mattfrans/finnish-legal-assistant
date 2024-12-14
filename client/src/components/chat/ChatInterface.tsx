@@ -12,14 +12,18 @@ interface Message {
   sources?: { link: string; title: string; section?: string }[];
 }
 
-export function ChatInterface() {
+interface ChatInterfaceProps {
+  initialSessionId?: number;
+}
+
+export function ChatInterface({ initialSessionId }: ChatInterfaceProps) {
   const [input, setInput] = useState("");
   const [messages, setMessages] = useState<Message[]>([]);
-  const [sessionId, setSessionId] = useState<number | null>(null);
+  const [sessionId, setSessionId] = useState<number | null>(initialSessionId ?? null);
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
-  // Create a new chat session when component mounts
+  // Create a new chat session when component mounts (only if no initialSessionId)
   const createSession = useMutation({
     mutationFn: async () => {
       const res = await fetch("/api/sessions", {
@@ -34,24 +38,28 @@ export function ChatInterface() {
   });
 
   useEffect(() => {
-    createSession.mutate();
-  }, []);
+    if (!initialSessionId) {
+      createSession.mutate();
+    }
+  }, [initialSessionId]);
 
   // Get existing messages if session exists
-  const { data: sessionData } = useQuery({
+  const { data: sessionData } = useQuery<ChatSession>({
     queryKey: [`/api/sessions/${sessionId}`],
     enabled: sessionId !== null,
-    onSuccess: (data) => {
-      if (data.queries) {
-        setMessages(
-          data.queries.map(q => ([
-            { role: "user", content: q.question },
-            { role: "assistant", content: q.answer, sources: q.sources }
-          ])).flat()
-        );
-      }
-    },
   });
+
+  // Load messages when session data changes
+  useEffect(() => {
+    if (sessionData?.queries) {
+      setMessages(
+        sessionData.queries.map(q => ([
+          { role: "user", content: q.question },
+          { role: "assistant", content: q.answer, sources: q.sources }
+        ])).flat()
+      );
+    }
+  }, [sessionData]);
 
   const mutation = useMutation({
     mutationFn: async (question: string) => {
