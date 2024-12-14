@@ -1,8 +1,9 @@
 import { Request, Response } from 'express';
 import { db } from '@db/index';
 import { chatSessions, queries } from '@db/schema';
-import { desc, eq } from 'drizzle-orm';
+import { desc, eq, sql } from 'drizzle-orm';
 import { LegalService } from '../services/legal';
+import { type ChatSession, type Query } from '../types/api';
 
 export class ChatController {
   private legalService: LegalService;
@@ -13,25 +14,51 @@ export class ChatController {
 
   async createSession(req: Request, res: Response) {
     try {
-      const title = "Uusi keskustelu"; // "New conversation" in Finnish
-      console.log('Creating new chat session with title:', title);
+      console.log('Creating new chat session...');
       
+      // Simplified session creation with better error handling
       const [session] = await db.insert(chatSessions)
-        .values({ title })
-        .returning({
-          id: chatSessions.id,
-          title: chatSessions.title,
-          createdAt: chatSessions.createdAt
-        });
+        .values({ 
+          title: "Uusi keskustelu",
+          createdAt: new Date()
+        })
+        .returning();
+
+      if (!session) {
+        console.error('No session returned from database insert');
+        throw new Error('Failed to create chat session in database');
+      }
+
+      const response = {
+        id: session.id,
+        title: session.title,
+        createdAt: session.createdAt.toISOString(),
+        queries: []
+      };
+
+      console.log('Successfully created chat session:', response);
+      res.status(201).json(response);
       
-      console.log('Successfully created chat session:', session);
-      res.json(session);
     } catch (error) {
-      console.error('Error creating chat session:', error);
-      res.status(500).json({ 
-        error: "Failed to create chat session",
-        code: "CREATE_ERROR",
-        details: error instanceof Error ? error.message : 'Unknown error'
+      console.error('Error in createSession:', error);
+      
+      let statusCode = 500;
+      let errorMessage = 'Failed to create chat session';
+      let errorCode = 'CREATE_ERROR';
+      
+      if (error instanceof Error) {
+        console.error('Detailed error:', error.message);
+        if (error.message.includes('database') || error.message.includes('connection')) {
+          statusCode = 503;
+          errorMessage = 'Database connection error';
+          errorCode = 'DATABASE_ERROR';
+        }
+      }
+      
+      res.status(statusCode).json({ 
+        error: errorMessage,
+        code: errorCode,
+        details: error instanceof Error ? error.message : 'Unknown error occurred'
       });
     }
   }

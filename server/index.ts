@@ -75,7 +75,7 @@ const errorHandler = (err: any, _req: Request, res: Response, _next: NextFunctio
   }
 
   // Start server
-  const PORT = process.env.PORT || 5000;
+  const PORT = process.env.PORT ? parseInt(process.env.PORT) : 5000;
   server.listen(PORT, "0.0.0.0", () => {
     log(`API Server running on http://0.0.0.0:${PORT}`);
     if (app.get("env") === "development") {
