@@ -16,17 +16,18 @@ export class ChatController {
     try {
       console.log('Creating new chat session...');
       
-      // Simplified session creation with better error handling
+      // Create session using Drizzle ORM
       const [session] = await db.insert(chatSessions)
-        .values({ 
-          title: "Uusi keskustelu",
+        .values({
+          title: 'New Chat',
           createdAt: new Date()
         })
         .returning();
 
+      console.log('Created session:', session);
+
       if (!session) {
-        console.error('No session returned from database insert');
-        throw new Error('Failed to create chat session in database');
+        throw new Error('Failed to create chat session');
       }
 
       const response = {
@@ -36,28 +37,15 @@ export class ChatController {
         queries: []
       };
 
-      console.log('Successfully created chat session:', response);
+      console.log('Sending response:', response);
       res.status(201).json(response);
       
     } catch (error) {
       console.error('Error in createSession:', error);
+      console.error('Error stack:', error instanceof Error ? error.stack : 'No stack available');
       
-      let statusCode = 500;
-      let errorMessage = 'Failed to create chat session';
-      let errorCode = 'CREATE_ERROR';
-      
-      if (error instanceof Error) {
-        console.error('Detailed error:', error.message);
-        if (error.message.includes('database') || error.message.includes('connection')) {
-          statusCode = 503;
-          errorMessage = 'Database connection error';
-          errorCode = 'DATABASE_ERROR';
-        }
-      }
-      
-      res.status(statusCode).json({ 
-        error: errorMessage,
-        code: errorCode,
+      res.status(500).json({ 
+        error: 'Failed to create chat session',
         details: error instanceof Error ? error.message : 'Unknown error occurred'
       });
     }
