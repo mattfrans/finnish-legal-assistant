@@ -23,12 +23,12 @@ export function registerRoutes(app: Express): Server {
   app.get(`${apiV1}/documents/popular`, (req, res) => documentsController.getPopular(req, res));
   app.get(`${apiV1}/documents/categories`, (req, res) => documentsController.getCategories(req, res));
 
-  // Chat routes
-  app.post(`${apiV1}/chat/sessions`, (req, res) => chatController.createSession(req, res));
-  app.get(`${apiV1}/chat/sessions`, (req, res) => chatController.getSessions(req, res));
-  app.get(`${apiV1}/chat/sessions/:id`, (req, res) => chatController.getSession(req, res));
-  app.post(`${apiV1}/chat/sessions/:id/messages`, (req, res) => chatController.addMessage(req, res));
-  app.get(`${apiV1}/chat/sessions/:id/analysis`, (req, res) => chatController.getAnalysis(req, res));
+  // Chat routes - ensure these are after API prefix
+  app.post(`${apiV1}/sessions`, (req, res) => chatController.createSession(req, res));
+  app.get(`${apiV1}/sessions`, (req, res) => chatController.getSessions(req, res));
+  app.get(`${apiV1}/sessions/:id`, (req, res) => chatController.getSession(req, res));
+  app.post(`${apiV1}/sessions/:id/chat`, (req, res) => chatController.addMessage(req, res));
+  app.get(`${apiV1}/sessions/:id/analysis`, (req, res) => chatController.getAnalysis(req, res));
 
   // Error handling middleware
   app.use((err: any, req: any, res: any, next: any) => {
