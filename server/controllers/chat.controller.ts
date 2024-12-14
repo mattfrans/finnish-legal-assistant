@@ -14,14 +14,24 @@ export class ChatController {
   async createSession(req: Request, res: Response) {
     try {
       const title = "Uusi keskustelu"; // "New conversation" in Finnish
+      console.log('Creating new chat session with title:', title);
+      
       const [session] = await db.insert(chatSessions)
         .values({ title })
-        .returning();
+        .returning({
+          id: chatSessions.id,
+          title: chatSessions.title,
+          createdAt: chatSessions.createdAt
+        });
+      
+      console.log('Successfully created chat session:', session);
       res.json(session);
     } catch (error) {
+      console.error('Error creating chat session:', error);
       res.status(500).json({ 
         error: "Failed to create chat session",
-        code: "CREATE_ERROR"
+        code: "CREATE_ERROR",
+        details: error instanceof Error ? error.message : 'Unknown error'
       });
     }
   }
