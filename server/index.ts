@@ -9,10 +9,29 @@ const app = express();
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 
+// CORS middleware
+app.use((req, res, next) => {
+  // In development, allow all origins
+  const origin = req.headers.origin || '*';
+  res.setHeader('Access-Control-Allow-Origin', origin);
+  
+  // Allow credentials and set allowed methods/headers
+  res.setHeader('Access-Control-Allow-Credentials', 'true');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
+  res.setHeader('Access-Control-Max-Age', '3600');
+
+  // Handle preflight requests
+  if (req.method === 'OPTIONS') {
+    return res.status(200).end();
+  }
+
+  next();
+});
+
 // Security headers
 app.use((_req, res, next) => {
   res.setHeader('X-Content-Type-Options', 'nosniff');
-  res.setHeader('X-Frame-Options', 'DENY');
   res.setHeader('X-XSS-Protection', '1; mode=block');
   next();
 });
@@ -56,11 +75,18 @@ const errorHandler = (err: any, _req: Request, res: Response, _next: NextFunctio
   }
 
   // Start server
-  const PORT = 5000;
+  const PORT = process.env.PORT || 5000;
   server.listen(PORT, "0.0.0.0", () => {
     log(`API Server running on http://0.0.0.0:${PORT}`);
     if (app.get("env") === "development") {
       log("Development mode: Vite middleware enabled");
+      log("CORS enabled for all origins");
     }
+  });
+
+  // Handle server errors
+  server.on('error', (error: Error) => {
+    console.error('Server error:', error);
+    process.exit(1);
   });
 })();
