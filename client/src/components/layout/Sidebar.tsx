@@ -12,7 +12,7 @@ export function Sidebar() {
   ];
 
   return (
-    <aside className="w-64 border-r bg-muted/30 p-4 hidden md:block">
+    <aside className="w-64 border-r bg-muted/30 p-4 flex-shrink-0">
       <nav className="space-y-2">
         {links.map((link) => {
           const Icon = link.icon;
