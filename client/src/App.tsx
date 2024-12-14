@@ -10,7 +10,7 @@ function App() {
       <Header />
       <div className="flex flex-1 overflow-hidden">
         <Sidebar />
-        <main className="flex-1 overflow-y-auto bg-background">
+        <main className="flex-1 overflow-y-auto bg-[#f5f3f0]">
           <Switch>
             <Route path="/" component={Home} />
             <Route path="/history" component={History} />
