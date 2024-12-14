@@ -37,11 +37,12 @@ export function History() {
 
   if (selectedSession && sessionDetails) {
     return (
-      <ScrollArea className="h-full">
-        <div className="h-full">
-          <ChatInterface initialSessionId={selectedSession} />
-        </div>
-      </ScrollArea>
+      <div className="h-full">
+        <ChatInterface 
+          key={selectedSession} 
+          initialSessionId={selectedSession} 
+        />
+      </div>
     );
   }
 
