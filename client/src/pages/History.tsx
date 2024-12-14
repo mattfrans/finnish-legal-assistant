@@ -59,10 +59,15 @@ export function History() {
               <div className="flex items-center gap-3">
                 <MessageCircle className="h-5 w-5 text-muted-foreground" />
                 <div>
-                  <p className="font-medium">Chat Session</p>
+                  <p className="font-medium">{session.title || 'Chat Session'}</p>
                   <p className="text-sm text-muted-foreground">
                     {formatDistanceToNow(new Date(session.createdAt), { addSuffix: true })}
                   </p>
+                  {session.queries?.[0] && (
+                    <p className="text-sm text-muted-foreground truncate max-w-md">
+                      {session.queries[0].question}
+                    </p>
+                  )}
                 </div>
               </div>
               <ChevronRight className="h-5 w-5 text-muted-foreground" />
