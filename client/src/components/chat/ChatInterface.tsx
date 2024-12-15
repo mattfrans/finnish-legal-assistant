@@ -4,7 +4,7 @@ import { MessageBubble } from "./MessageBubble";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
-import { Send, Paperclip, X, Pencil, Pin, Trash2 } from "lucide-react";
+import { Send, Paperclip, Pencil, Pin, Trash2 } from "lucide-react";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import {
@@ -18,12 +18,20 @@ import {
 interface ChatSession {
   id: number;
   title: string;
+  isPinned: boolean;
   createdAt: string;
-  queries: Array<{
+  queries?: Array<{
     id: number;
     question: string;
     answer: string;
-    sources: Array<{ link: string; title: string; section?: string }>;
+    sources?: Array<{
+      link: string;
+      title: string;
+      section?: string;
+      type?: 'finlex' | 'kkv' | 'other';
+      identifier?: string;
+      relevance: number;
+    }>;
     createdAt: string;
   }>;
 }
@@ -64,16 +72,16 @@ export function ChatInterface({ initialSessionId }: ChatInterfaceProps) {
   const [attachments, setAttachments] = useState<FileAttachment[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
-
-  // Two recommended prompts matching the screenshot
-  const recommendedPrompts = [
-    "Can you provide examples of names that have faced legal challenges due to being deemed offensive?",
-    "What are the potential consequences if I proceed with using an offensive name despite these risks?"
-  ];
   const queryClient = useQueryClient();
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const [isInitialized, setIsInitialized] = useState(false);
   const [showRenameDialog, setShowRenameDialog] = useState(false);
+
+  // Legal-focused recommended prompts
+  const recommendedPrompts = [
+    "1. Markkinointi ja menettelyt asiakassuhteessa...",
+    "2. Kuluttajalla on oikeus..."
+  ];
 
   // Scroll to bottom of messages
   const scrollToBottom = () => {
@@ -87,7 +95,7 @@ export function ChatInterface({ initialSessionId }: ChatInterfaceProps) {
   // Create a new chat session
   const createSession = useMutation({
     mutationFn: async () => {
-      const res = await fetch("/api/sessions", {
+      const res = await fetch("/api/v1/sessions", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
       });
@@ -119,11 +127,11 @@ export function ChatInterface({ initialSessionId }: ChatInterfaceProps) {
     }
   }, [initialSessionId, isInitialized]);
 
-  // Fetch session data and messages
+  // Fetch session data
   const { data: sessionData } = useQuery<ChatSession>({
-    queryKey: [`/api/sessions/${sessionId}`],
+    queryKey: [`/api/v1/sessions/${sessionId}`],
     enabled: sessionId !== null,
-    staleTime: 0, // Always fetch fresh data
+    staleTime: 0,
     gcTime: 0,
   });
 
@@ -136,19 +144,22 @@ export function ChatInterface({ initialSessionId }: ChatInterfaceProps) {
       
       const messageList: Message[] = sortedQueries.flatMap(q => [
         { role: "user", content: q.question },
-        { role: "assistant", content: q.answer, sources: q.sources }
+        { 
+          role: "assistant", 
+          content: q.answer,
+          sources: q.sources
+        }
       ]);
       
       setMessages(messageList);
     }
   }, [sessionData]);
 
-  // Send message mutation
   const sendMessage = useMutation({
     mutationFn: async (formData: FormData) => {
       if (!sessionId) throw new Error("No active session");
       
-      const res = await fetch(`/api/sessions/${sessionId}/chat`, {
+      const res = await fetch(`/api/v1/sessions/${sessionId}/chat`, {
         method: "POST",
         body: formData,
       });
@@ -162,7 +173,6 @@ export function ChatInterface({ initialSessionId }: ChatInterfaceProps) {
     },
     onMutate: (formData) => {
       const question = formData.get('question') as string;
-      // Only add user message with serializable data
       const userMessage: Message = {
         role: "user",
         content: question,
@@ -179,15 +189,14 @@ export function ChatInterface({ initialSessionId }: ChatInterfaceProps) {
       setAttachments([]);
     },
     onSuccess: (data) => {
-      const newMessage: Message = { 
-        role: "assistant", 
+      const newMessage: Message = {
+        role: "assistant",
         content: data.answer,
         sources: data.sources
       };
       setMessages(prev => [...prev.slice(0, -1), prev[prev.length - 1], newMessage]);
-      // Refresh session data
-      queryClient.invalidateQueries({ queryKey: [`/api/sessions/${sessionId}`] });
-      queryClient.invalidateQueries({ queryKey: ["/api/sessions"] });
+      queryClient.invalidateQueries({ queryKey: [`/api/v1/sessions/${sessionId}`] });
+      queryClient.invalidateQueries({ queryKey: ["/api/v1/sessions"] });
     },
     onError: (error) => {
       toast({
@@ -195,7 +204,6 @@ export function ChatInterface({ initialSessionId }: ChatInterfaceProps) {
         description: error.message || "Failed to send message. Please try again.",
         variant: "destructive",
       });
-      // Remove the optimistic update
       setMessages(prev => prev.slice(0, -1));
     },
   });
@@ -230,9 +238,7 @@ export function ChatInterface({ initialSessionId }: ChatInterfaceProps) {
 
       const newAttachments = newFiles.map(file => ({
         file,
-        preview: file.type.startsWith('image/') 
-          ? URL.createObjectURL(file)
-          : URL.createObjectURL(file)
+        preview: URL.createObjectURL(file)
       }));
 
       setAttachments(prev => [...prev, ...newAttachments]);
@@ -344,80 +350,67 @@ export function ChatInterface({ initialSessionId }: ChatInterfaceProps) {
           </div>
         </div>
       )}
-      <div className="flex-1 overflow-y-auto space-y-4 p-4">
-        {messages.map((msg, i) => (
-          <MessageBubble key={`${sessionId}-${i}`} message={msg} />
-        ))}
-        <div ref={messagesEndRef} />
-      </div>
       
-      <div className="space-y-2 relative">
-        <div className="absolute right-0 -top-32 w-72 space-y-2">
-          {recommendedPrompts.map((prompt, index) => (
-            <button
-              key={index}
-              onClick={() => {
-                setInput(prompt);
-                const formData = new FormData();
-                formData.append('question', prompt);
-                sendMessage.mutate(formData);
-              }}
-              className="w-full text-left px-3 py-2 text-sm bg-background hover:bg-muted rounded-lg transition-colors border"
-            >
-              {prompt}
-            </button>
+      <div className="flex-1 overflow-y-auto p-4">
+        <div className="space-y-4">
+          {messages.map((msg, i) => (
+            <MessageBubble key={`${sessionId}-${i}`} message={msg} />
           ))}
-          <Button
-            variant="outline"
-            className="w-full justify-start gap-2"
-            onClick={() => {
-              if (messages.length > 0) {
-                const lastUserMessage = messages[messages.length - 2];
-                if (lastUserMessage?.role === 'user') {
-                  const formData = new FormData();
-                  formData.append('question', lastUserMessage.content);
-                  sendMessage.mutate(formData);
-                }
-              }
-            }}
-          >
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              viewBox="0 0 16 16"
-              fill="none"
-              className="h-4 w-4"
-              stroke="currentColor"
-            >
-              <path
-                d="M13.5 8.5a5.5 5.5 0 1 1-.724-2.747l1.224.24"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-            </svg>
-            Regenerate response
-          </Button>
+          <div ref={messagesEndRef} />
         </div>
-        {attachments.length > 0 && (
-          <div className="flex flex-wrap gap-2 p-2 bg-muted/30 rounded-md">
-            {attachments.map((att, index) => (
-              <div key={index} className="flex items-center gap-2 bg-background p-1 rounded">
-                <span className="text-sm truncate max-w-[200px]">{att.file.name}</span>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-6 w-6"
+      </div>
+
+      <div className="p-4 space-y-4">
+        {messages.length === 0 && (
+          <div className="mb-4">
+            <p className="text-sm text-muted-foreground mb-2">Tämä perustuu kuluttajansuojalakiin (1978/038) ja KKV:n ohjeistuksiin.</p>
+            <div className="space-y-2">
+              {recommendedPrompts.map((prompt, index) => (
+                <button
+                  key={index}
                   onClick={() => {
-                    URL.revokeObjectURL(att.preview);
-                    setAttachments(prev => prev.filter((_, i) => i !== index));
+                    const formData = new FormData();
+                    formData.append('question', prompt);
+                    sendMessage.mutate(formData);
                   }}
+                  className="w-full text-left p-3 text-sm hover:bg-accent rounded-lg transition-colors"
                 >
-                  <X className="h-4 w-4" />
-                </Button>
-              </div>
-            ))}
+                  {prompt}
+                </button>
+              ))}
+            </div>
+            <button
+              onClick={() => {
+                if (messages.length > 0) {
+                  const lastUserMessage = messages[messages.length - 2];
+                  if (lastUserMessage?.role === 'user') {
+                    const formData = new FormData();
+                    formData.append('question', lastUserMessage.content);
+                    sendMessage.mutate(formData);
+                  }
+                }
+              }}
+              className="w-full flex items-center justify-center gap-2 p-2 text-sm rounded-md border border-border hover:bg-accent/50 transition-colors"
+            >
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                viewBox="0 0 16 16"
+                fill="none"
+                className="h-4 w-4"
+                stroke="currentColor"
+              >
+                <path
+                  d="M13.5 8.5a5.5 5.5 0 1 1-.724-2.747l1.224.24"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </svg>
+              Regenerate response
+            </button>
           </div>
         )}
-        <div className="flex gap-2">
+
+        <div className="flex items-center gap-2">
           <input
             type="file"
             ref={fileInputRef}
