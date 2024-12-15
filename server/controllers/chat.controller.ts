@@ -269,4 +269,95 @@ export class ChatController {
       });
     }
   }
+  async updateSession(req: Request, res: Response) {
+    try {
+      const { title } = req.body;
+      const sessionId = parseInt(req.params.id);
+
+      if (!title?.trim()) {
+        return res.status(400).json({
+          error: "Title cannot be empty",
+          code: "INVALID_INPUT"
+        });
+      }
+
+      const [session] = await db.update(chatSessions)
+        .set({ 
+          title: title.trim(),
+          updatedAt: new Date()
+        })
+        .where(eq(chatSessions.id, sessionId))
+        .returning();
+
+      if (!session) {
+        return res.status(404).json({
+          error: "Chat session not found",
+          code: "NOT_FOUND"
+        });
+      }
+
+      res.json(session);
+    } catch (error) {
+      console.error('Error updating chat session:', error);
+      res.status(500).json({
+        error: "Failed to update chat session",
+        code: "UPDATE_ERROR"
+      });
+    }
+  }
+
+  async togglePin(req: Request, res: Response) {
+    try {
+      const { isPinned } = req.body;
+      const sessionId = parseInt(req.params.id);
+
+      const [session] = await db.update(chatSessions)
+        .set({ 
+          isPinned: isPinned,
+          updatedAt: new Date()
+        })
+        .where(eq(chatSessions.id, sessionId))
+        .returning();
+
+      if (!session) {
+        return res.status(404).json({
+          error: "Chat session not found",
+          code: "NOT_FOUND"
+        });
+      }
+
+      res.json(session);
+    } catch (error) {
+      console.error('Error toggling pin status:', error);
+      res.status(500).json({
+        error: "Failed to update pin status",
+        code: "UPDATE_ERROR"
+      });
+    }
+  }
+
+  async deleteSession(req: Request, res: Response) {
+    try {
+      const sessionId = parseInt(req.params.id);
+
+      const [session] = await db.delete(chatSessions)
+        .where(eq(chatSessions.id, sessionId))
+        .returning();
+
+      if (!session) {
+        return res.status(404).json({
+          error: "Chat session not found",
+          code: "NOT_FOUND"
+        });
+      }
+
+      res.status(204).end();
+    } catch (error) {
+      console.error('Error deleting chat session:', error);
+      res.status(500).json({
+        error: "Failed to delete chat session",
+        code: "DELETE_ERROR"
+      });
+    }
+  }
 }
