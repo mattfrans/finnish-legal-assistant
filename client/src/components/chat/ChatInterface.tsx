@@ -4,8 +4,16 @@ import { MessageBubble } from "./MessageBubble";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
-import { Send, Paperclip, X } from "lucide-react";
+import { Send, Paperclip, X, Pencil, Pin, Trash2 } from "lucide-react";
 import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 
 interface ChatSession {
   id: number;
@@ -57,14 +65,15 @@ export function ChatInterface({ initialSessionId }: ChatInterfaceProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
 
+  // Two recommended prompts matching the screenshot
   const recommendedPrompts = [
-    "Mitä oikeuksia minulla on kuluttajana verkkokaupassa?",
-    "Miten voin tehdä reklamaation viallisesta tuotteesta?",
-    "Kerro työsopimuksen irtisanomisen säännöistä"
+    "Can you provide examples of names that have faced legal challenges due to being deemed offensive?",
+    "What are the potential consequences if I proceed with using an offensive name despite these risks?"
   ];
   const queryClient = useQueryClient();
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const [isInitialized, setIsInitialized] = useState(false);
+  const [showRenameDialog, setShowRenameDialog] = useState(false);
 
   // Scroll to bottom of messages
   const scrollToBottom = () => {
@@ -238,16 +247,112 @@ export function ChatInterface({ initialSessionId }: ChatInterfaceProps) {
   }
 
   return (
-    <div className="flex flex-col h-full max-w-4xl mx-auto p-4">
-      <div className="flex-1 overflow-y-auto space-y-4 mb-4">
+    <div className="flex flex-col h-full max-w-4xl mx-auto">
+      {sessionId && (
+        <div className="p-4 border-b flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Dialog open={showRenameDialog} onOpenChange={setShowRenameDialog}>
+              <DialogTrigger asChild>
+                <Button variant="ghost" className="gap-2">
+                  <Pencil className="h-4 w-4" />
+                  Rename Chat
+                </Button>
+              </DialogTrigger>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Rename Chat</DialogTitle>
+                </DialogHeader>
+                <form onSubmit={async (e) => {
+                  e.preventDefault();
+                  const formData = new FormData(e.currentTarget);
+                  const title = formData.get('title') as string;
+                  try {
+                    await fetch(`/api/v1/sessions/${sessionId}`, {
+                      method: 'PATCH',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({ title: title.trim() }),
+                    });
+                    queryClient.invalidateQueries({ queryKey: ['/api/v1/sessions'] });
+                    setShowRenameDialog(false);
+                  } catch (error) {
+                    toast({
+                      title: "Error",
+                      description: "Failed to rename chat",
+                      variant: "destructive",
+                    });
+                  }
+                }} className="space-y-4 mt-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="title">Title</Label>
+                    <Input id="title" name="title" placeholder="Enter chat title" />
+                  </div>
+                  <div className="flex justify-end">
+                    <Button type="submit">Save</Button>
+                  </div>
+                </form>
+              </DialogContent>
+            </Dialog>
+          </div>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={async () => {
+                try {
+                  const res = await fetch(`/api/v1/sessions/${sessionId}/pin`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ isPinned: true }),
+                  });
+                  if (!res.ok) throw new Error('Failed to pin chat');
+                  queryClient.invalidateQueries({ queryKey: ['/api/v1/sessions'] });
+                  toast({ description: 'Chat pinned successfully' });
+                } catch (error) {
+                  toast({
+                    title: "Error",
+                    description: "Failed to pin chat",
+                    variant: "destructive",
+                  });
+                }
+              }}
+            >
+              <Pin className="h-4 w-4" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="hover:text-destructive"
+              onClick={() => {
+                if (confirm('Are you sure you want to delete this chat?')) {
+                  fetch(`/api/v1/sessions/${sessionId}`, { method: 'DELETE' })
+                    .then(() => {
+                      queryClient.invalidateQueries({ queryKey: ['/api/v1/sessions'] });
+                      window.location.href = '/history';
+                    })
+                    .catch(() => {
+                      toast({
+                        title: "Error",
+                        description: "Failed to delete chat",
+                        variant: "destructive",
+                      });
+                    });
+                }
+              }}
+            >
+              <Trash2 className="h-4 w-4" />
+            </Button>
+          </div>
+        </div>
+      )}
+      <div className="flex-1 overflow-y-auto space-y-4 p-4">
         {messages.map((msg, i) => (
           <MessageBubble key={`${sessionId}-${i}`} message={msg} />
         ))}
         <div ref={messagesEndRef} />
       </div>
       
-      <div className="space-y-2">
-        <div className="flex flex-wrap gap-2 mb-4">
+      <div className="space-y-2 relative">
+        <div className="absolute right-0 -top-32 w-72 space-y-2">
           {recommendedPrompts.map((prompt, index) => (
             <button
               key={index}
@@ -257,11 +362,40 @@ export function ChatInterface({ initialSessionId }: ChatInterfaceProps) {
                 formData.append('question', prompt);
                 sendMessage.mutate(formData);
               }}
-              className="px-3 py-2 text-sm bg-muted hover:bg-muted/80 rounded-lg transition-colors"
+              className="w-full text-left px-3 py-2 text-sm bg-background hover:bg-muted rounded-lg transition-colors border"
             >
               {prompt}
             </button>
           ))}
+          <Button
+            variant="outline"
+            className="w-full justify-start gap-2"
+            onClick={() => {
+              if (messages.length > 0) {
+                const lastUserMessage = messages[messages.length - 2];
+                if (lastUserMessage?.role === 'user') {
+                  const formData = new FormData();
+                  formData.append('question', lastUserMessage.content);
+                  sendMessage.mutate(formData);
+                }
+              }
+            }}
+          >
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              viewBox="0 0 16 16"
+              fill="none"
+              className="h-4 w-4"
+              stroke="currentColor"
+            >
+              <path
+                d="M13.5 8.5a5.5 5.5 0 1 1-.724-2.747l1.224.24"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
+            Regenerate response
+          </Button>
         </div>
         {attachments.length > 0 && (
           <div className="flex flex-wrap gap-2 p-2 bg-muted/30 rounded-md">
