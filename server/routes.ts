@@ -27,7 +27,10 @@ export function registerRoutes(app: Express): Server {
   app.post(`${apiV1}/sessions`, (req, res) => chatController.createSession(req, res));
   app.get(`${apiV1}/sessions`, (req, res) => chatController.getSessions(req, res));
   app.get(`${apiV1}/sessions/:id`, (req, res) => chatController.getSession(req, res));
-  app.post(`${apiV1}/sessions/:id/chat`, (req, res) => chatController.addMessage(req, res));
+  app.post(`${apiV1}/sessions/:id/chat`, 
+  (req, res, next) => chatController.upload.array('attachments')(req, res, next),
+  (req, res) => chatController.addMessage(req, res)
+);
   app.get(`${apiV1}/sessions/:id/analysis`, (req, res) => chatController.getAnalysis(req, res));
 
   // Error handling middleware
