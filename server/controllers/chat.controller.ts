@@ -189,16 +189,21 @@ export class ChatController {
       const legalResponse = await this.legalService.analyzeLegalContext(question);
 
       // Store in database
+      const insertData = {
+        sessionId,
+        question,
+        answer: legalResponse.answer,
+        sources: legalResponse.sources,
+        legalContext: legalResponse.legalContext,
+        confidence: legalResponse.confidence
+      };
+
+      if (attachments.length > 0) {
+        Object.assign(insertData, { attachments });
+      }
+
       const [query] = await db.insert(queries)
-        .values({
-          sessionId,
-          question,
-          answer: legalResponse.answer,
-          sources: legalResponse.sources,
-          legalContext: legalResponse.legalContext,
-          confidence: legalResponse.confidence,
-          attachments
-        })
+        .values(insertData)
         .returning();
 
       // Return enhanced response
@@ -206,6 +211,7 @@ export class ChatController {
         id: query.id,
         answer: legalResponse.answer,
         sources: legalResponse.sources,
+        attachments,
         metadata: {
           processingTime: Date.now() - startTime,
           sourcesUsed: ['finlex', 'kkv'],
