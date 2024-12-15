@@ -24,6 +24,7 @@ interface Message {
   role: "user" | "assistant";
   content: string;
   sources?: { link: string; title: string; section?: string }[];
+  attachments?: {name:string, size: number, type: string}[];
 }
 
 interface ChatInterfaceProps {
@@ -132,11 +133,13 @@ export function ChatInterface({ initialSessionId }: ChatInterfaceProps) {
       setInput("");
     },
     onSuccess: (data) => {
-      setMessages(prev => [...prev, { 
+      const newMessage: Message = { 
         role: "assistant", 
         content: data.answer,
-        sources: data.sources 
-      }]);
+        sources: data.sources,
+        attachments: data.attachments?.map(a => ({name: a.name, size: a.size, type: a.type}))
+      };
+      setMessages(prev => [...prev, newMessage]);
       // Refresh session data
       queryClient.invalidateQueries({ queryKey: [`/api/sessions/${sessionId}`] });
       queryClient.invalidateQueries({ queryKey: ["/api/sessions"] });
@@ -198,6 +201,43 @@ export function ChatInterface({ initialSessionId }: ChatInterfaceProps) {
           </div>
         )}
         <div className="flex gap-2">
+          <input
+            type="file"
+            ref={fileInputRef}
+            className="hidden"
+            multiple
+            onChange={(e) => {
+              if (e.target.files) {
+                const newFiles = Array.from(e.target.files);
+                const totalSize = newFiles.reduce((acc, file) => acc + file.size, 0);
+                const maxSize = 5 * 1024 * 1024; // 5MB
+
+                if (totalSize > maxSize) {
+                  toast({
+                    title: "Error",
+                    description: "Total file size cannot exceed 5MB",
+                    variant: "destructive",
+                  });
+                  return;
+                }
+
+                setAttachments(prev => [...prev, ...newFiles]);
+                if (fileInputRef.current) {
+                  fileInputRef.current.value = '';
+                }
+              }
+            }}
+            accept="image/*,.pdf,.doc,.docx,.txt"
+          />
+          <Button
+            variant="outline"
+            size="icon"
+            type="button"
+            onClick={() => fileInputRef.current?.click()}
+            disabled={sendMessage.isPending}
+          >
+            <Paperclip className="h-4 w-4" />
+          </Button>
           <Textarea
             value={input}
             onChange={(e) => setInput(e.target.value)}
@@ -211,38 +251,13 @@ export function ChatInterface({ initialSessionId }: ChatInterfaceProps) {
             }}
             disabled={sendMessage.isPending}
           />
-          <div className="flex flex-col gap-2">
-            <input
-              type="file"
-              ref={fileInputRef}
-              className="hidden"
-              multiple
-              onChange={(e) => {
-                const files = Array.from(e.target.files || []);
-                setAttachments(prev => [...prev, ...files]);
-                if (fileInputRef.current) {
-                  fileInputRef.current.value = '';
-                }
-              }}
-              accept="image/*,.pdf,.doc,.docx,.txt"
-            />
-            <Button
-              variant="outline"
-              size="icon"
-              type="button"
-              onClick={() => fileInputRef.current?.click()}
-              disabled={sendMessage.isPending}
-            >
-              <Paperclip className="h-4 w-4" />
-            </Button>
-            <Button 
-              onClick={handleSubmit}
-              disabled={sendMessage.isPending || (!input.trim() && attachments.length === 0)}
-              size="icon"
-            >
-              <Send className="h-4 w-4" />
-            </Button>
-          </div>
+          <Button 
+            onClick={handleSubmit}
+            disabled={sendMessage.isPending || (!input.trim() && attachments.length === 0)}
+            size="icon"
+          >
+            <Send className="h-4 w-4" />
+          </Button>
         </div>
       </div>
     </div>
