@@ -78,17 +78,24 @@ const errorHandler = (err: any, _req: Request, res: Response, _next: NextFunctio
 
   // Start server
   const PORT = process.env.PORT ? parseInt(process.env.PORT) : 5000;
-  server.listen(PORT, "0.0.0.0", () => {
-    log(`API Server running on http://0.0.0.0:${PORT}`);
-    if (app.get("env") === "development") {
-      log("Development mode: Vite middleware enabled");
-      log("CORS enabled for all origins");
-    }
-  });
+  
+  const startServer = (port: number) => {
+    server.listen(port, "0.0.0.0", () => {
+      log(`API Server running on http://0.0.0.0:${port}`);
+      if (app.get("env") === "development") {
+        log("Development mode: Vite middleware enabled");
+        log("CORS enabled for all origins");
+      }
+    }).on('error', (error: any) => {
+      if (error.code === 'EADDRINUSE') {
+        log(`Port ${port} is busy, trying ${port + 1}...`);
+        startServer(port + 1);
+      } else {
+        console.error('Server error:', error);
+        process.exit(1);
+      }
+    });
+  };
 
-  // Handle server errors
-  server.on('error', (error: Error) => {
-    console.error('Server error:', error);
-    process.exit(1);
-  });
+  startServer(PORT);
 })();
