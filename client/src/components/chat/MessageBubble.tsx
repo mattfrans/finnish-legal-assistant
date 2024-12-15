@@ -1,5 +1,6 @@
 import { Card } from "@/components/ui/card";
-import { ExternalLink } from "lucide-react";
+import { ExternalLink, FileText, Image as ImageIcon } from "lucide-react";
+import { AspectRatio } from "@/components/ui/aspect-ratio";
 
 interface MessageProps {
   message: {
@@ -12,6 +13,13 @@ interface MessageProps {
       type?: 'finlex' | 'kkv' | 'other';
       identifier?: string;
       relevance: number;
+    }[];
+    attachments?: {
+      type: 'image' | 'document';
+      filename: string;
+      url: string;
+      contentType: string;
+      size: number;
     }[];
     legalContext?: string;
     confidence?: {
@@ -56,6 +64,44 @@ export function MessageBubble({ message }: MessageProps) {
               </div>
             )}
 
+            {message.attachments && message.attachments.length > 0 && (
+              <div className="mt-3 space-y-2">
+                <p className="text-sm font-medium">Attachments:</p>
+                <div className="grid grid-cols-2 gap-2">
+                  {message.attachments.map((attachment, i) => (
+                    <div key={i} className="relative group">
+                      {attachment.type === 'image' ? (
+                        <AspectRatio ratio={16 / 9}>
+                          <a 
+                            href={attachment.url} 
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="block w-full h-full"
+                          >
+                            <img
+                              src={attachment.url}
+                              alt={attachment.filename}
+                              className="object-cover w-full h-full rounded-md hover:opacity-90 transition-opacity"
+                            />
+                          </a>
+                        </AspectRatio>
+                      ) : (
+                        <a
+                          href={attachment.url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="flex items-center gap-2 p-2 bg-background rounded-md hover:bg-accent transition-colors"
+                        >
+                          <FileText className="h-4 w-4 flex-shrink-0" />
+                          <span className="text-sm truncate">{attachment.filename}</span>
+                        </a>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+            
             {message.sources && message.sources.length > 0 && (
               <div>
                 <p className="text-sm font-medium mb-2">Legal Sources:</p>

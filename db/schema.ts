@@ -24,6 +24,13 @@ export const queries = pgTable('queries', {
     identifier?: string;
     relevance: number;
   }>>().default([]).notNull(),
+  attachments: json('attachments').$type<Array<{
+    type: 'image' | 'document';
+    filename: string;
+    url: string;
+    contentType: string;
+    size: number;
+  }>>().default([]),
   legalContext: text('legal_context'),
   confidence: json('confidence').$type<{
     score: number;

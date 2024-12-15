@@ -4,8 +4,46 @@ import { chatSessions, queries } from '@db/schema';
 import { desc, eq, sql } from 'drizzle-orm';
 import { LegalService } from '../services/legal';
 import { type ChatSession, type Query } from '../types/api';
+import multer from 'multer';
+import path from 'path';
+import fs from 'fs/promises';
 
 export class ChatController {
+  // Set up file upload storage
+  private upload = multer({
+    storage: multer.diskStorage({
+      destination: async (req, file, cb) => {
+        const uploadDir = path.join(process.cwd(), 'uploads');
+        try {
+          await fs.mkdir(uploadDir, { recursive: true });
+          cb(null, uploadDir);
+        } catch (error) {
+          cb(error as Error, uploadDir);
+        }
+      },
+      filename: (req, file, cb) => {
+        const uniqueSuffix = `${Date.now()}-${Math.round(Math.random() * 1E9)}`;
+        cb(null, `${uniqueSuffix}-${file.originalname}`);
+      }
+    }),
+    fileFilter: (req, file, cb) => {
+      const allowedTypes = [
+        'image/jpeg', 'image/png', 'image/gif',
+        'application/pdf',
+        'application/msword',
+        'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        'text/plain'
+      ];
+      if (allowedTypes.includes(file.mimetype)) {
+        cb(null, true);
+      } else {
+        cb(new Error('Invalid file type'));
+      }
+    },
+    limits: {
+      fileSize: 5 * 1024 * 1024 // 5MB limit
+    }
+  });
   private legalService: LegalService;
 
   constructor() {
@@ -109,7 +147,16 @@ export class ChatController {
 
   async addMessage(req: Request, res: Response) {
     try {
-      const { question } = req.body;
+      const question = req.body.question || '';
+      const files = (req.files || []) as Express.Multer.File[];
+      
+      const attachments = files.map(file => ({
+        type: file.mimetype.startsWith('image/') ? 'image' : 'document',
+        filename: file.originalname,
+        url: `/uploads/${file.filename}`,
+        contentType: file.mimetype,
+        size: file.size
+      }));
       const sessionId = parseInt(req.params.id);
 
       // Verify session exists
@@ -149,7 +196,8 @@ export class ChatController {
           answer: legalResponse.answer,
           sources: legalResponse.sources,
           legalContext: legalResponse.legalContext,
-          confidence: legalResponse.confidence
+          confidence: legalResponse.confidence,
+          attachments
         })
         .returning();
 

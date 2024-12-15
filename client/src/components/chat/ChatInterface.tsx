@@ -4,7 +4,8 @@ import { MessageBubble } from "./MessageBubble";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
-import { Send } from "lucide-react";
+import { Send, Paperclip, X } from "lucide-react";
+import { Label } from "@/components/ui/label";
 
 interface ChatSession {
   id: number;
@@ -33,6 +34,8 @@ export function ChatInterface({ initialSessionId }: ChatInterfaceProps) {
   const [input, setInput] = useState("");
   const [messages, setMessages] = useState<Message[]>([]);
   const [sessionId, setSessionId] = useState<number | null>(null);
+  const [attachments, setAttachments] = useState<File[]>([]);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -108,13 +111,12 @@ export function ChatInterface({ initialSessionId }: ChatInterfaceProps) {
 
   // Send message mutation
   const sendMessage = useMutation({
-    mutationFn: async (question: string) => {
+    mutationFn: async (formData: FormData) => {
       if (!sessionId) throw new Error("No active session");
       
       const res = await fetch(`/api/sessions/${sessionId}/chat`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ question }),
+        body: formData,
       });
       
       if (!res.ok) {
@@ -152,9 +154,16 @@ export function ChatInterface({ initialSessionId }: ChatInterfaceProps) {
 
   const handleSubmit = () => {
     const trimmedInput = input.trim();
-    if (!trimmedInput) return;
+    if (!trimmedInput && attachments.length === 0) return;
     
-    sendMessage.mutate(trimmedInput);
+    const formData = new FormData();
+    formData.append('question', trimmedInput);
+    attachments.forEach(file => {
+      formData.append('attachments', file);
+    });
+    
+    sendMessage.mutate(formData);
+    setAttachments([]);
   };
 
   if (!isInitialized) {
@@ -170,27 +179,71 @@ export function ChatInterface({ initialSessionId }: ChatInterfaceProps) {
         <div ref={messagesEndRef} />
       </div>
       
-      <div className="flex gap-2">
-        <Textarea
-          value={input}
-          onChange={(e) => setInput(e.target.value)}
-          placeholder="Ask your legal question..."
-          className="resize-none"
-          onKeyDown={(e) => {
-            if (e.key === "Enter" && !e.shiftKey) {
-              e.preventDefault();
-              handleSubmit();
-            }
-          }}
-          disabled={sendMessage.isPending}
-        />
-        <Button 
-          onClick={handleSubmit}
-          disabled={sendMessage.isPending || !input.trim()}
-          className="px-4"
-        >
-          <Send className="h-4 w-4" />
-        </Button>
+      <div className="space-y-2">
+        {attachments.length > 0 && (
+          <div className="flex flex-wrap gap-2 p-2 bg-muted/30 rounded-md">
+            {attachments.map((file, index) => (
+              <div key={index} className="flex items-center gap-2 bg-background p-1 rounded">
+                <span className="text-sm truncate max-w-[200px]">{file.name}</span>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-6 w-6"
+                  onClick={() => setAttachments(prev => prev.filter((_, i) => i !== index))}
+                >
+                  <X className="h-4 w-4" />
+                </Button>
+              </div>
+            ))}
+          </div>
+        )}
+        <div className="flex gap-2">
+          <Textarea
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            placeholder="Ask your legal question..."
+            className="resize-none"
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && !e.shiftKey) {
+                e.preventDefault();
+                handleSubmit();
+              }
+            }}
+            disabled={sendMessage.isPending}
+          />
+          <div className="flex flex-col gap-2">
+            <input
+              type="file"
+              ref={fileInputRef}
+              className="hidden"
+              multiple
+              onChange={(e) => {
+                const files = Array.from(e.target.files || []);
+                setAttachments(prev => [...prev, ...files]);
+                if (fileInputRef.current) {
+                  fileInputRef.current.value = '';
+                }
+              }}
+              accept="image/*,.pdf,.doc,.docx,.txt"
+            />
+            <Button
+              variant="outline"
+              size="icon"
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={sendMessage.isPending}
+            >
+              <Paperclip className="h-4 w-4" />
+            </Button>
+            <Button 
+              onClick={handleSubmit}
+              disabled={sendMessage.isPending || (!input.trim() && attachments.length === 0)}
+              size="icon"
+            >
+              <Send className="h-4 w-4" />
+            </Button>
+          </div>
+        </div>
       </div>
     </div>
   );
