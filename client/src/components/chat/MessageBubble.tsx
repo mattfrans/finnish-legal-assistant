@@ -1,26 +1,26 @@
 import { Card } from "@/components/ui/card";
-import { ExternalLink, FileText, Image as ImageIcon } from "lucide-react";
+import { ExternalLink, FileText } from "lucide-react";
 import { AspectRatio } from "@/components/ui/aspect-ratio";
 
 interface MessageProps {
   message: {
     role: "user" | "assistant";
     content: string;
-    sources?: {
+    sources?: Array<{
       link: string;
       title: string;
       section?: string;
       type?: 'finlex' | 'kkv' | 'other';
       identifier?: string;
       relevance: number;
-    }[];
-    attachments?: {
-      type: 'image' | 'document';
+    }>;
+    attachments?: Array<{
       filename: string;
       url: string;
       contentType: string;
       size: number;
-    }[];
+      type: 'image' | 'document';
+    }>;
     legalContext?: string;
     confidence?: {
       score: number;
@@ -31,6 +31,13 @@ interface MessageProps {
 
 export function MessageBubble({ message }: MessageProps) {
   const isUser = message.role === "user";
+  const formatFileSize = (bytes: number) => {
+    if (bytes < 1024) return `${bytes} B`;
+    const kb = bytes / 1024;
+    if (kb < 1024) return `${kb.toFixed(1)} KB`;
+    const mb = kb / 1024;
+    return `${mb.toFixed(1)} MB`;
+  };
 
   return (
     <div className={`flex ${isUser ? "justify-end" : "justify-start"}`}>
@@ -38,6 +45,49 @@ export function MessageBubble({ message }: MessageProps) {
         isUser ? "bg-primary text-primary-foreground" : "bg-muted"
       }`}>
         <p className="whitespace-pre-wrap">{message.content}</p>
+        
+        {message.attachments && message.attachments.length > 0 && (
+          <div className="mt-3 space-y-2">
+            <p className="text-sm font-medium">Attachments:</p>
+            <div className="grid grid-cols-2 gap-2">
+              {message.attachments.map((attachment, i) => (
+                <div key={i} className="relative group">
+                  {attachment.type === 'image' ? (
+                    <AspectRatio ratio={16 / 9}>
+                      <a 
+                        href={attachment.url} 
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="block w-full h-full"
+                      >
+                        <img
+                          src={attachment.url}
+                          alt={attachment.filename}
+                          className="object-cover w-full h-full rounded-md hover:opacity-90 transition-opacity"
+                        />
+                      </a>
+                    </AspectRatio>
+                  ) : (
+                    <a
+                      href={attachment.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center gap-2 p-2 bg-background rounded-md hover:bg-accent transition-colors"
+                    >
+                      <FileText className="h-4 w-4 flex-shrink-0" />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm truncate">{attachment.filename}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {formatFileSize(attachment.size)}
+                        </p>
+                      </div>
+                    </a>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
         
         {message.role === "assistant" && (
           <div className="mt-3 pt-3 border-t border-border/50 space-y-4">
@@ -61,44 +111,6 @@ export function MessageBubble({ message }: MessageProps) {
               <div className="text-sm">
                 <p className="font-medium mb-1">Legal Context:</p>
                 <p className="text-muted-foreground">{message.legalContext}</p>
-              </div>
-            )}
-
-            {message.attachments && message.attachments.length > 0 && (
-              <div className="mt-3 space-y-2">
-                <p className="text-sm font-medium">Attachments:</p>
-                <div className="grid grid-cols-2 gap-2">
-                  {message.attachments.map((attachment, i) => (
-                    <div key={i} className="relative group">
-                      {attachment.type === 'image' ? (
-                        <AspectRatio ratio={16 / 9}>
-                          <a 
-                            href={attachment.url} 
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="block w-full h-full"
-                          >
-                            <img
-                              src={attachment.url}
-                              alt={attachment.filename}
-                              className="object-cover w-full h-full rounded-md hover:opacity-90 transition-opacity"
-                            />
-                          </a>
-                        </AspectRatio>
-                      ) : (
-                        <a
-                          href={attachment.url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="flex items-center gap-2 p-2 bg-background rounded-md hover:bg-accent transition-colors"
-                        >
-                          <FileText className="h-4 w-4 flex-shrink-0" />
-                          <span className="text-sm truncate">{attachment.filename}</span>
-                        </a>
-                      )}
-                    </div>
-                  ))}
-                </div>
               </div>
             )}
             

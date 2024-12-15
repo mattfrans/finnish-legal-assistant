@@ -23,8 +23,26 @@ interface ChatSession {
 interface Message {
   role: "user" | "assistant";
   content: string;
-  sources?: { link: string; title: string; section?: string }[];
-  attachments?: {name:string, size: number, type: string}[];
+  sources?: Array<{
+    link: string;
+    title: string;
+    section?: string;
+    type?: 'finlex' | 'kkv' | 'other';
+    identifier?: string;
+    relevance: number;
+  }>;
+  attachments?: Array<{
+    filename: string;
+    url: string;
+    contentType: string;
+    size: number;
+    type: 'image' | 'document';
+  }>;
+}
+
+interface FileAttachment {
+  file: File;
+  preview: string;
 }
 
 interface ChatInterfaceProps {
@@ -35,7 +53,7 @@ export function ChatInterface({ initialSessionId }: ChatInterfaceProps) {
   const [input, setInput] = useState("");
   const [messages, setMessages] = useState<Message[]>([]);
   const [sessionId, setSessionId] = useState<number | null>(null);
-  const [attachments, setAttachments] = useState<File[]>([]);
+  const [attachments, setAttachments] = useState<FileAttachment[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -91,7 +109,7 @@ export function ChatInterface({ initialSessionId }: ChatInterfaceProps) {
     queryKey: [`/api/sessions/${sessionId}`],
     enabled: sessionId !== null,
     staleTime: 0, // Always fetch fresh data
-    cacheTime: 0,
+    gcTime: 0,
   });
 
   // Update messages when session data changes
@@ -127,19 +145,31 @@ export function ChatInterface({ initialSessionId }: ChatInterfaceProps) {
       
       return res.json();
     },
-    onMutate: (question) => {
-      // Optimistically update UI
-      setMessages(prev => [...prev, { role: "user", content: question }]);
+    onMutate: (formData) => {
+      const question = formData.get('question') as string;
+      // Only add user message with serializable data
+      const userMessage: Message = {
+        role: "user",
+        content: question,
+        attachments: attachments.map(att => ({
+          filename: att.file.name,
+          contentType: att.file.type,
+          size: att.file.size,
+          type: att.file.type.startsWith('image/') ? 'image' : 'document',
+          url: att.preview
+        }))
+      };
+      setMessages(prev => [...prev, userMessage]);
       setInput("");
+      setAttachments([]);
     },
     onSuccess: (data) => {
       const newMessage: Message = { 
         role: "assistant", 
         content: data.answer,
-        sources: data.sources,
-        attachments: data.attachments?.map(a => ({name: a.name, size: a.size, type: a.type}))
+        sources: data.sources
       };
-      setMessages(prev => [...prev, newMessage]);
+      setMessages(prev => [...prev.slice(0, -1), prev[prev.length - 1], newMessage]);
       // Refresh session data
       queryClient.invalidateQueries({ queryKey: [`/api/sessions/${sessionId}`] });
       queryClient.invalidateQueries({ queryKey: ["/api/sessions"] });
@@ -161,12 +191,40 @@ export function ChatInterface({ initialSessionId }: ChatInterfaceProps) {
     
     const formData = new FormData();
     formData.append('question', trimmedInput);
-    attachments.forEach(file => {
-      formData.append('attachments', file);
+    attachments.forEach(att => {
+      formData.append('attachments', att.file);
     });
     
     sendMessage.mutate(formData);
-    setAttachments([]);
+  };
+
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files) {
+      const newFiles = Array.from(e.target.files);
+      const totalSize = newFiles.reduce((acc, file) => acc + file.size, 0);
+      const maxSize = 5 * 1024 * 1024; // 5MB
+
+      if (totalSize > maxSize) {
+        toast({
+          title: "Error",
+          description: "Total file size cannot exceed 5MB",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      const newAttachments = newFiles.map(file => ({
+        file,
+        preview: file.type.startsWith('image/') 
+          ? URL.createObjectURL(file)
+          : URL.createObjectURL(file)
+      }));
+
+      setAttachments(prev => [...prev, ...newAttachments]);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+    }
   };
 
   if (!isInitialized) {
@@ -185,14 +243,17 @@ export function ChatInterface({ initialSessionId }: ChatInterfaceProps) {
       <div className="space-y-2">
         {attachments.length > 0 && (
           <div className="flex flex-wrap gap-2 p-2 bg-muted/30 rounded-md">
-            {attachments.map((file, index) => (
+            {attachments.map((att, index) => (
               <div key={index} className="flex items-center gap-2 bg-background p-1 rounded">
-                <span className="text-sm truncate max-w-[200px]">{file.name}</span>
+                <span className="text-sm truncate max-w-[200px]">{att.file.name}</span>
                 <Button
                   variant="ghost"
                   size="icon"
                   className="h-6 w-6"
-                  onClick={() => setAttachments(prev => prev.filter((_, i) => i !== index))}
+                  onClick={() => {
+                    URL.revokeObjectURL(att.preview);
+                    setAttachments(prev => prev.filter((_, i) => i !== index));
+                  }}
                 >
                   <X className="h-4 w-4" />
                 </Button>
@@ -206,27 +267,7 @@ export function ChatInterface({ initialSessionId }: ChatInterfaceProps) {
             ref={fileInputRef}
             className="hidden"
             multiple
-            onChange={(e) => {
-              if (e.target.files) {
-                const newFiles = Array.from(e.target.files);
-                const totalSize = newFiles.reduce((acc, file) => acc + file.size, 0);
-                const maxSize = 5 * 1024 * 1024; // 5MB
-
-                if (totalSize > maxSize) {
-                  toast({
-                    title: "Error",
-                    description: "Total file size cannot exceed 5MB",
-                    variant: "destructive",
-                  });
-                  return;
-                }
-
-                setAttachments(prev => [...prev, ...newFiles]);
-                if (fileInputRef.current) {
-                  fileInputRef.current.value = '';
-                }
-              }
-            }}
+            onChange={handleFileSelect}
             accept="image/*,.pdf,.doc,.docx,.txt"
           />
           <Button
