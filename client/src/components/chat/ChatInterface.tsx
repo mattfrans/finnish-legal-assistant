@@ -56,6 +56,12 @@ export function ChatInterface({ initialSessionId }: ChatInterfaceProps) {
   const [attachments, setAttachments] = useState<FileAttachment[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
+
+  const recommendedPrompts = [
+    "Mitä oikeuksia minulla on kuluttajana verkkokaupassa?",
+    "Miten voin tehdä reklamaation viallisesta tuotteesta?",
+    "Kerro työsopimuksen irtisanomisen säännöistä"
+  ];
   const queryClient = useQueryClient();
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const [isInitialized, setIsInitialized] = useState(false);
@@ -241,6 +247,22 @@ export function ChatInterface({ initialSessionId }: ChatInterfaceProps) {
       </div>
       
       <div className="space-y-2">
+        <div className="flex flex-wrap gap-2 mb-4">
+          {recommendedPrompts.map((prompt, index) => (
+            <button
+              key={index}
+              onClick={() => {
+                setInput(prompt);
+                const formData = new FormData();
+                formData.append('question', prompt);
+                sendMessage.mutate(formData);
+              }}
+              className="px-3 py-2 text-sm bg-muted hover:bg-muted/80 rounded-lg transition-colors"
+            >
+              {prompt}
+            </button>
+          ))}
+        </div>
         {attachments.length > 0 && (
           <div className="flex flex-wrap gap-2 p-2 bg-muted/30 rounded-md">
             {attachments.map((att, index) => (
