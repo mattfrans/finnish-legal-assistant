@@ -24,13 +24,17 @@ export function registerRoutes(app: Express): Server {
   app.get(`${apiV1}/documents/categories`, (req, res) => documentsController.getCategories(req, res));
 
   // Chat routes - ensure these are after API prefix
+  // Chat session routes
   app.post(`${apiV1}/sessions`, (req, res) => chatController.createSession(req, res));
   app.get(`${apiV1}/sessions`, (req, res) => chatController.getSessions(req, res));
   app.get(`${apiV1}/sessions/:id`, (req, res) => chatController.getSession(req, res));
+  app.patch(`${apiV1}/sessions/:id`, (req, res) => chatController.updateSession(req, res));
+  app.delete(`${apiV1}/sessions/:id`, (req, res) => chatController.deleteSession(req, res));
+  app.put(`${apiV1}/sessions/:id/pin`, (req, res) => chatController.togglePin(req, res));
   app.post(`${apiV1}/sessions/:id/chat`, 
-  (req, res, next) => chatController.upload.array('attachments')(req, res, next),
-  (req, res) => chatController.addMessage(req, res)
-);
+    (req, res, next) => chatController.upload.array('attachments')(req, res, next),
+    (req, res) => chatController.addMessage(req, res)
+  );
   app.get(`${apiV1}/sessions/:id/analysis`, (req, res) => chatController.getAnalysis(req, res));
 
   // Error handling middleware

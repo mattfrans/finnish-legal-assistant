@@ -1,4 +1,4 @@
-import { pgTable, text, serial, timestamp, json, integer, varchar, pgEnum } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, timestamp, json, integer, varchar, pgEnum, boolean } from "drizzle-orm/pg-core";
 import { createInsertSchema, createSelectSchema } from "drizzle-zod";
 import { relations } from "drizzle-orm";
 import { sql } from "drizzle-orm";
@@ -7,7 +7,9 @@ import { sql } from "drizzle-orm";
 export const chatSessions = pgTable('chat_sessions', {
   id: serial('id').primaryKey(),
   title: text('title').notNull(),
-  createdAt: timestamp('created_at').defaultNow().notNull()
+  isPinned: boolean('is_pinned').default(false).notNull(),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull()
 });
 
 // Individual queries within a chat session
