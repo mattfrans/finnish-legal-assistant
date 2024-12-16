@@ -1,6 +1,7 @@
 import { Card } from "@/components/ui/card";
 import { ExternalLink, FileText } from "lucide-react";
 import { AspectRatio } from "@/components/ui/aspect-ratio";
+import { motion } from "framer-motion";
 
 interface MessageProps {
   message: {
@@ -40,10 +41,18 @@ export function MessageBubble({ message }: MessageProps) {
   };
 
   return (
-    <div className={`flex ${isUser ? "justify-end" : "justify-start"}`}>
-      <Card className={`max-w-[80%] p-4 ${
-        isUser ? "bg-primary text-primary-foreground" : "bg-muted"
-      }`}>
+    <motion.div 
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, y: -20 }}
+      transition={{ duration: 0.3, ease: "easeOut" }}
+      className={`flex ${isUser ? "justify-end" : "justify-start"}`}
+    >
+      <Card 
+        className={`max-w-[80%] p-4 ${
+          isUser ? "bg-primary text-primary-foreground" : "bg-muted"
+        } transform-gpu transition-all duration-200 hover:scale-[1.01]`}
+      >
         <p className="whitespace-pre-wrap">{message.content}</p>
         
         {message.attachments && message.attachments.length > 0 && (
@@ -156,6 +165,6 @@ export function MessageBubble({ message }: MessageProps) {
           </div>
         )}
       </Card>
-    </div>
+    </motion.div>
   );
 }

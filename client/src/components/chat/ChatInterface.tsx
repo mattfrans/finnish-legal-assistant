@@ -7,6 +7,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Send, Paperclip, Pencil, Pin, Trash2 } from "lucide-react";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
+import { motion, AnimatePresence } from "framer-motion";
 import {
   Dialog,
   DialogContent,
@@ -358,59 +359,77 @@ export function ChatInterface({ initialSessionId }: ChatInterfaceProps) {
               <MessageBubble key={`${sessionId}-${i}`} message={msg} />
             ))}
             
-            {/* Recommendations panel */}
-            <div className="space-y-4 ml-auto max-w-[80%]">
-              <div className="text-sm text-muted-foreground text-right">
-                Tämä perustuu kuluttajansuojalakiin (1978/038) ja KKV:n ohjeistuksiin.
-              </div>
-              
-              {/* Recommended prompts */}
-              {recommendedPrompts.map((prompt, index) => (
-                <div
-                  key={index}
-                  onClick={() => {
-                    const formData = new FormData();
-                    formData.append('question', prompt);
-                    sendMessage.mutate(formData);
-                  }}
-                  className="ml-auto bg-muted hover:bg-accent p-4 rounded-lg cursor-pointer transition-colors text-sm max-w-[80%]"
+            <AnimatePresence>
+              <motion.div 
+                layout
+                className="flex flex-col items-end space-y-4 w-full"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+              >
+                <motion.div 
+                  className="text-sm text-muted-foreground ml-auto mr-4"
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  transition={{ delay: 0.2 }}
                 >
-                  {prompt}
-                </div>
-              ))}
-              
-              {/* Regenerate button */}
-              {messages.length > 0 && (
-                <button
-                  onClick={() => {
-                    if (messages.length > 0) {
-                      const lastUserMessage = messages[messages.length - 2];
-                      if (lastUserMessage?.role === 'user') {
-                        const formData = new FormData();
-                        formData.append('question', lastUserMessage.content);
-                        sendMessage.mutate(formData);
-                      }
-                    }
-                  }}
-                  className="ml-auto flex items-center gap-2 p-3 text-sm bg-muted hover:bg-accent rounded-lg transition-colors"
-                >
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    viewBox="0 0 16 16"
-                    fill="none"
-                    className="h-4 w-4"
-                    stroke="currentColor"
+                  Tämä perustuu kuluttajansuojalakiin (1978/038) ja KKV:n ohjeistuksiin.
+                </motion.div>
+                
+                {recommendedPrompts.slice(0, 2).map((prompt, index) => (
+                  <motion.div
+                    key={index}
+                    initial={{ opacity: 0, x: 50 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    exit={{ opacity: 0, x: 50 }}
+                    transition={{ delay: 0.1 * (index + 1) }}
+                    onClick={() => {
+                      const formData = new FormData();
+                      formData.append('question', prompt);
+                      sendMessage.mutate(formData);
+                    }}
+                    className="bg-muted hover:bg-accent p-4 rounded-lg cursor-pointer transition-all duration-200 text-sm max-w-[80%] transform-gpu hover:scale-[1.02] ml-auto mr-4"
                   >
-                    <path
-                      d="M13.5 8.5a5.5 5.5 0 1 1-.724-2.747l1.224.24"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    />
-                  </svg>
-                  Regenerate response
-                </button>
-              )}
-            </div>
+                    {prompt}
+                  </motion.div>
+                ))}
+                
+                {messages.length > 0 && (
+                  <motion.button
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: 20 }}
+                    transition={{ delay: 0.3 }}
+                    onClick={() => {
+                      if (messages.length > 0) {
+                        const lastUserMessage = messages[messages.length - 2];
+                        if (lastUserMessage?.role === 'user') {
+                          const formData = new FormData();
+                          formData.append('question', lastUserMessage.content);
+                          sendMessage.mutate(formData);
+                        }
+                      }
+                    }}
+                    className="ml-auto mr-4 flex items-center gap-2 p-3 text-sm bg-muted hover:bg-accent rounded-lg transition-all duration-200 transform-gpu hover:scale-[1.02]"
+                  >
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      viewBox="0 0 16 16"
+                      fill="none"
+                      className="h-4 w-4"
+                      stroke="currentColor"
+                    >
+                      <path
+                        d="M13.5 8.5a5.5 5.5 0 1 1-.724-2.747l1.224.24"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      />
+                    </svg>
+                    Regenerate response
+                  </motion.button>
+                )}
+              </motion.div>
+            </AnimatePresence>
             
             <div ref={messagesEndRef} />
           </div>
