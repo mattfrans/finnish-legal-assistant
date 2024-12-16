@@ -2,11 +2,14 @@ import { Card } from "@/components/ui/card";
 import { ExternalLink, FileText } from "lucide-react";
 import { AspectRatio } from "@/components/ui/aspect-ratio";
 import { motion } from "framer-motion";
+import { RatingInterface } from "./RatingInterface";
 
 interface MessageProps {
   message: {
+    id?: number;
     role: "user" | "assistant";
     content: string;
+    sessionId?: number;
     sources?: Array<{
       link: string;
       title: string;
@@ -161,6 +164,13 @@ export function MessageBubble({ message }: MessageProps) {
                   ))}
                 </ul>
               </div>
+            )}
+            
+            {message.role === "assistant" && message.id && message.sessionId && (
+              <RatingInterface 
+                queryId={message.id} 
+                sessionId={message.sessionId}
+              />
             )}
           </div>
         )}
