@@ -35,6 +35,7 @@ export function registerRoutes(app: Express): Server {
     (req, res, next) => chatController.upload.array('attachments')(req, res, next),
     (req, res) => chatController.addMessage(req, res)
   );
+  app.post(`${apiV1}/sessions/:id/queries/:queryId/feedback`, (req, res) => chatController.addFeedback(req, res));
   app.get(`${apiV1}/sessions/:id/analysis`, (req, res) => chatController.getAnalysis(req, res));
 
   // Error handling middleware

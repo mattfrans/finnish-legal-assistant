@@ -360,4 +360,45 @@ export class ChatController {
       });
     }
   }
+
+  async addFeedback(req: Request, res: Response) {
+    try {
+      const sessionId = parseInt(req.params.id);
+      const queryId = parseInt(req.params.queryId);
+      const { rating, helpful, comment } = req.body;
+
+      // Validate input
+      if (typeof rating !== 'number' || rating < 1 || rating > 5) {
+        return res.status(400).json({
+          error: "Invalid rating. Must be between 1 and 5",
+          code: "INVALID_INPUT"
+        });
+      }
+
+      if (typeof helpful !== 'boolean') {
+        return res.status(400).json({
+          error: "Helpful field must be a boolean",
+          code: "INVALID_INPUT"
+        });
+      }
+
+      // Create feedback
+      const [feedback] = await db.insert(schema.feedback)
+        .values({
+          queryId,
+          rating,
+          helpful,
+          comment: comment || null,
+        })
+        .returning();
+
+      res.json(feedback);
+    } catch (error) {
+      console.error('Error adding feedback:', error);
+      res.status(500).json({
+        error: "Failed to add feedback",
+        code: "FEEDBACK_ERROR"
+      });
+    }
+  }
 }

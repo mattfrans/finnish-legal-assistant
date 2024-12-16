@@ -103,5 +103,27 @@ export const documentSectionsRelations = relations(documentSections, ({ one }) =
 // Zod schemas
 export const insertLegalDocumentSchema = createInsertSchema(legalDocuments);
 export const selectLegalDocumentSchema = createSelectSchema(legalDocuments);
+// Feedback and ratings for chat responses
+export const feedback = pgTable('feedback', {
+  id: serial('id').primaryKey(),
+  queryId: integer('query_id').references(() => queries.id, { onDelete: 'cascade' }).notNull(),
+  rating: integer('rating').notNull(),
+  comment: text('comment'),
+  helpful: boolean('helpful').default(false).notNull(),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull()
+});
+
+// Relations for feedback
+export const feedbackRelations = relations(feedback, ({ one }) => ({
+  query: one(queries, {
+    fields: [feedback.queryId],
+    references: [queries.id]
+  })
+}));
+
+// Schema exports
+export const insertFeedbackSchema = createInsertSchema(feedback);
+export const selectFeedbackSchema = createSelectSchema(feedback);
 export const insertDocumentSectionSchema = createInsertSchema(documentSections);
 export const selectDocumentSectionSchema = createSelectSchema(documentSections);
