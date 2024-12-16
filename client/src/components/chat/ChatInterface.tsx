@@ -308,21 +308,21 @@ export function ChatInterface({ initialSessionId }: ChatInterfaceProps) {
                   const res = await fetch(`/api/v1/sessions/${sessionId}/pin`, {
                     method: 'PUT',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ isPinned: true }),
+                    body: JSON.stringify({ isPinned: !sessionData?.isPinned }),
                   });
-                  if (!res.ok) throw new Error('Failed to pin chat');
+                  if (!res.ok) throw new Error('Failed to update pin status');
                   queryClient.invalidateQueries({ queryKey: ['/api/v1/sessions'] });
-                  toast({ description: 'Chat pinned successfully' });
+                  toast({ description: 'Pin status updated' });
                 } catch (error) {
                   toast({
                     title: "Error",
-                    description: "Failed to pin chat",
+                    description: "Failed to update pin status",
                     variant: "destructive",
                   });
                 }
               }}
             >
-              <Pin className="h-4 w-4" />
+              <Pin className={`h-4 w-4 ${sessionData?.isPinned ? 'fill-primary' : ''}`} />
             </Button>
             <Button
               variant="ghost"
@@ -351,104 +351,110 @@ export function ChatInterface({ initialSessionId }: ChatInterfaceProps) {
         </div>
       )}
       
-      <div className="flex-1 overflow-y-auto p-4">
-        <div className="space-y-4">
-          {messages.map((msg, i) => (
-            <MessageBubble key={`${sessionId}-${i}`} message={msg} />
-          ))}
-          <div ref={messagesEndRef} />
-        </div>
-      </div>
-
-      <div className="p-4 space-y-4">
-        {messages.length === 0 && (
-          <div className="mb-4">
-            <p className="text-sm text-muted-foreground mb-2">Tämä perustuu kuluttajansuojalakiin (1978/038) ja KKV:n ohjeistuksiin.</p>
-            <div className="space-y-2">
+      <div className="flex flex-1 overflow-hidden">
+        <div className="flex-1 overflow-y-auto p-4">
+          <div className="space-y-4">
+            {messages.map((msg, i) => (
+              <MessageBubble key={`${sessionId}-${i}`} message={msg} />
+            ))}
+            
+            {/* Recommendations panel */}
+            <div className="space-y-4 ml-auto max-w-[80%]">
+              <div className="text-sm text-muted-foreground text-right">
+                Tämä perustuu kuluttajansuojalakiin (1978/038) ja KKV:n ohjeistuksiin.
+              </div>
+              
+              {/* Recommended prompts */}
               {recommendedPrompts.map((prompt, index) => (
-                <button
+                <div
                   key={index}
                   onClick={() => {
                     const formData = new FormData();
                     formData.append('question', prompt);
                     sendMessage.mutate(formData);
                   }}
-                  className="w-full text-left p-3 text-sm hover:bg-accent rounded-lg transition-colors"
+                  className="ml-auto bg-muted hover:bg-accent p-4 rounded-lg cursor-pointer transition-colors text-sm max-w-[80%]"
                 >
                   {prompt}
-                </button>
+                </div>
               ))}
+              
+              {/* Regenerate button */}
+              {messages.length > 0 && (
+                <button
+                  onClick={() => {
+                    if (messages.length > 0) {
+                      const lastUserMessage = messages[messages.length - 2];
+                      if (lastUserMessage?.role === 'user') {
+                        const formData = new FormData();
+                        formData.append('question', lastUserMessage.content);
+                        sendMessage.mutate(formData);
+                      }
+                    }
+                  }}
+                  className="ml-auto flex items-center gap-2 p-3 text-sm bg-muted hover:bg-accent rounded-lg transition-colors"
+                >
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    viewBox="0 0 16 16"
+                    fill="none"
+                    className="h-4 w-4"
+                    stroke="currentColor"
+                  >
+                    <path
+                      d="M13.5 8.5a5.5 5.5 0 1 1-.724-2.747l1.224.24"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                  </svg>
+                  Regenerate response
+                </button>
+              )}
             </div>
-            <button
-              onClick={() => {
-                if (messages.length > 0) {
-                  const lastUserMessage = messages[messages.length - 2];
-                  if (lastUserMessage?.role === 'user') {
-                    const formData = new FormData();
-                    formData.append('question', lastUserMessage.content);
-                    sendMessage.mutate(formData);
-                  }
-                }
-              }}
-              className="w-full flex items-center justify-center gap-2 p-2 text-sm rounded-md border border-border hover:bg-accent/50 transition-colors"
-            >
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                viewBox="0 0 16 16"
-                fill="none"
-                className="h-4 w-4"
-                stroke="currentColor"
-              >
-                <path
-                  d="M13.5 8.5a5.5 5.5 0 1 1-.724-2.747l1.224.24"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                />
-              </svg>
-              Regenerate response
-            </button>
+            
+            <div ref={messagesEndRef} />
           </div>
-        )}
-
-        <div className="flex items-center gap-2">
-          <input
-            type="file"
-            ref={fileInputRef}
-            className="hidden"
-            multiple
-            onChange={handleFileSelect}
-            accept="image/*,.pdf,.doc,.docx,.txt"
-          />
-          <Button
-            variant="outline"
-            size="icon"
-            type="button"
-            onClick={() => fileInputRef.current?.click()}
-            disabled={sendMessage.isPending}
-          >
-            <Paperclip className="h-4 w-4" />
-          </Button>
-          <Textarea
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            placeholder="Ask your legal question..."
-            className="resize-none"
-            onKeyDown={(e) => {
-              if (e.key === "Enter" && !e.shiftKey) {
-                e.preventDefault();
-                handleSubmit();
-              }
-            }}
-            disabled={sendMessage.isPending}
-          />
-          <Button 
-            onClick={handleSubmit}
-            disabled={sendMessage.isPending || (!input.trim() && attachments.length === 0)}
-            size="icon"
-          >
-            <Send className="h-4 w-4" />
-          </Button>
         </div>
+      </div>
+
+      <div className="p-4 flex items-center gap-2">
+        <input
+          type="file"
+          ref={fileInputRef}
+          className="hidden"
+          multiple
+          onChange={handleFileSelect}
+          accept="image/*,.pdf,.doc,.docx,.txt"
+        />
+        <Button
+          variant="outline"
+          size="icon"
+          type="button"
+          onClick={() => fileInputRef.current?.click()}
+          disabled={sendMessage.isPending}
+        >
+          <Paperclip className="h-4 w-4" />
+        </Button>
+        <Textarea
+          value={input}
+          onChange={(e) => setInput(e.target.value)}
+          placeholder="Ask your legal question..."
+          className="resize-none"
+          onKeyDown={(e) => {
+            if (e.key === "Enter" && !e.shiftKey) {
+              e.preventDefault();
+              handleSubmit();
+            }
+          }}
+          disabled={sendMessage.isPending}
+        />
+        <Button 
+          onClick={handleSubmit}
+          disabled={sendMessage.isPending || (!input.trim() && attachments.length === 0)}
+          size="icon"
+        >
+          <Send className="h-4 w-4" />
+        </Button>
       </div>
     </div>
   );
