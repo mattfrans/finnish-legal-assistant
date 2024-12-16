@@ -274,11 +274,14 @@ export function ChatInterface({ initialSessionId }: ChatInterfaceProps) {
                   const formData = new FormData(e.currentTarget);
                   const title = formData.get('title') as string;
                   try {
-                    await fetch(`/api/v1/sessions/${sessionId}`, {
+                    const res = await fetch(`/api/v1/sessions/${sessionId}`, {
                       method: 'PATCH',
                       headers: { 'Content-Type': 'application/json' },
                       body: JSON.stringify({ title: title.trim() }),
                     });
+                    if (!res.ok) throw new Error('Failed to rename chat');
+                    const data = await res.json();
+                    queryClient.invalidateQueries({ queryKey: [`/api/v1/sessions/${sessionId}`] });
                     queryClient.invalidateQueries({ queryKey: ['/api/v1/sessions'] });
                     setShowRenameDialog(false);
                   } catch (error) {
@@ -323,7 +326,22 @@ export function ChatInterface({ initialSessionId }: ChatInterfaceProps) {
                 }
               }}
             >
-              <Pin className={`h-4 w-4 ${sessionData?.isPinned ? 'fill-primary' : ''}`} />
+              <motion.div
+                whileTap={{ scale: 0.9 }}
+                animate={{ 
+                  scale: sessionData?.isPinned ? 1.1 : 1,
+                  rotate: sessionData?.isPinned ? [0, 15, -15, 0] : 0,
+                }}
+                transition={{ 
+                  duration: 0.3,
+                  type: "spring",
+                  stiffness: 200
+                }}
+              >
+                <Pin className={`h-4 w-4 transition-all duration-300 ${
+                  sessionData?.isPinned ? 'fill-primary stroke-primary' : ''
+                }`} />
+              </motion.div>
             </Button>
             <Button
               variant="ghost"
