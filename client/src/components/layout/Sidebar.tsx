@@ -8,7 +8,7 @@ export function Sidebar() {
 
   const links = [
     { href: "/", icon: MessageSquare, label: "Chat" },
-    { href: "/history", icon: History, label: "History" },
+    { href: "/history", icon: History, label: "Legal Documents" },
   ];
 
   return (
