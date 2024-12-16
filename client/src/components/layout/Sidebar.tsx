@@ -1,5 +1,5 @@
 import { Link, useLocation } from "wouter";
-import { MessageSquare, History, Settings } from "lucide-react";
+import { MessageSquare, History, FileText } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 
@@ -8,7 +8,8 @@ export function Sidebar() {
 
   const links = [
     { href: "/", icon: MessageSquare, label: "Chat" },
-    { href: "/history", icon: History, label: "Legal Documents" },
+    { href: "/history", icon: History, label: "History" },
+    { href: "/presets", icon: FileText, label: "Legal Documents" },
   ];
 
   return (
