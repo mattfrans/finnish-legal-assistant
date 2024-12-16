@@ -1,4 +1,6 @@
 import { useState, useEffect, useRef } from "react";
+import { LanguageSelector } from "./LanguageSelector";
+type LanguageMode = 'professional' | 'regular' | 'simple' | 'crazy';
 import { useMutation, useQueryClient, useQuery } from "@tanstack/react-query";
 import { MessageBubble } from "./MessageBubble";
 import { Button } from "@/components/ui/button";
@@ -77,6 +79,7 @@ export function ChatInterface({ initialSessionId }: ChatInterfaceProps) {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const [isInitialized, setIsInitialized] = useState(false);
   const [showRenameDialog, setShowRenameDialog] = useState(false);
+  const [languageMode, setLanguageMode] = useState<LanguageMode>('regular');
 
   // Legal-focused recommended prompts
   const recommendedPrompts = [
@@ -304,6 +307,10 @@ export function ChatInterface({ initialSessionId }: ChatInterfaceProps) {
             </Dialog>
           </div>
           <div className="flex items-center gap-2">
+            <LanguageSelector
+              currentMode={languageMode}
+              onSelect={setLanguageMode}
+            />
             <Button
               variant="ghost"
               size="icon"
