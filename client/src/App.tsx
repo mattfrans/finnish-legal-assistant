@@ -5,6 +5,7 @@ import { LegalPresetsPage } from "@/pages/LegalPresetsPage";
 import { PricingPage } from "@/pages/PricingPage";
 import { Header } from "@/components/layout/Header";
 import { Sidebar } from "@/components/layout/Sidebar";
+import { ContextualHelpSidebar } from "@/components/help/ContextualHelpSidebar";
 import { 
   PanelGroup, 
   Panel
@@ -50,6 +51,7 @@ function App() {
           </Panel>
         </PanelGroup>
       </div>
+      <ContextualHelpSidebar />
     </div>
   );
 }
