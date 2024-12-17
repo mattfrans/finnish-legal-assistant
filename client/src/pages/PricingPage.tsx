@@ -1,4 +1,6 @@
+import { useState } from "react";
 import { motion } from "framer-motion";
+import { SubscriptionDialog } from "@/components/payment/SubscriptionDialog";
 import { CheckCircle2, XCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -99,6 +101,7 @@ const featureComparison = [
 ];
 
 export function PricingPage() {
+  const [selectedPlan, setSelectedPlan] = useState<PricingTier | null>(null);
   return (
     <div className="min-h-screen bg-background">
       <div className="py-24 px-4 mx-auto max-w-7xl">
@@ -158,9 +161,22 @@ export function PricingPage() {
                   className="w-full"
                   variant={tier.highlighted ? "default" : "outline"}
                   size="lg"
+                  onClick={() => setSelectedPlan(tier)}
                 >
                   {tier.buttonText}
                 </Button>
+
+                {selectedPlan && (
+                  <SubscriptionDialog
+                    isOpen={true}
+                    onClose={() => setSelectedPlan(null)}
+                    plan={{
+                      name: selectedPlan.name,
+                      price: parseFloat(selectedPlan.price.replace('€', '')) || 0,
+                      features: selectedPlan.features,
+                    }}
+                  />
+                )}
               </Card>
             </motion.div>
           ))}
