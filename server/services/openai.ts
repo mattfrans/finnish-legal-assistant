@@ -1,6 +1,10 @@
 import OpenAI from "openai";
 
 // the newest OpenAI model is "gpt-4o" which was released May 13, 2024. do not change this unless explicitly requested by the user
+if (!process.env.OPENAI_API_KEY) {
+  throw new Error('OPENAI_API_KEY environment variable is required');
+}
+
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
 interface LegalResponse {
@@ -121,6 +125,51 @@ Provide a JSON response with:
     } catch (error) {
       console.error('Error analyzing legal context:', error);
       throw new Error('Failed to analyze legal context');
+    }
+  }
+
+  async generateChatSuggestions(context: { messages: Array<{ role: "user" | "assistant"; content: string }> }): Promise<string[]> {
+    try {
+      const response = await openai.chat.completions.create({
+        model: "gpt-4o",
+        messages: [
+          {
+            role: "system",
+            content: `You are a Finnish legal assistant. Based on the conversation history, generate 3 relevant follow-up questions that the user might want to ask. Focus on Finnish law and regulations. The questions should be specific and contextual to the previous conversation.
+
+Output a JSON object with this structure:
+{
+  "suggestions": [
+    "specific question 1",
+    "specific question 2",
+    "specific question 3"
+  ]
+}`
+          },
+          ...context.messages.slice(-3),
+          {
+            role: "user",
+            content: "Based on our conversation, what are 3 specific follow-up questions I might want to ask?"
+          }
+        ],
+        temperature: 0.7,
+        response_format: { type: "json_object" }
+      });
+
+      const content = response.choices[0].message.content;
+      if (!content) {
+        throw new Error("Empty response from OpenAI");
+      }
+
+      const result = JSON.parse(content);
+      return result.suggestions || [];
+    } catch (error) {
+      console.error('Error generating chat suggestions:', error);
+      return [
+        "Could you explain more about my legal rights in this situation?",
+        "What are the specific requirements under Finnish law?",
+        "Are there any relevant precedent cases I should know about?"
+      ];
     }
   }
 }

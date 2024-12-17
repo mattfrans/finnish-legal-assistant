@@ -73,6 +73,7 @@ export function ChatInterface({ initialSessionId }: ChatInterfaceProps) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [sessionId, setSessionId] = useState<number | null>(null);
   const [attachments, setAttachments] = useState<FileAttachment[]>([]);
+  const [recommendedPrompts, setRecommendedPrompts] = useState<string[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -81,11 +82,77 @@ export function ChatInterface({ initialSessionId }: ChatInterfaceProps) {
   const [showRenameDialog, setShowRenameDialog] = useState(false);
   const [languageMode, setLanguageMode] = useState<LanguageMode>('regular');
 
-  // Legal-focused recommended prompts
-  const recommendedPrompts = [
-    "1. Markkinointi ja menettelyt asiakassuhteessa...",
-    "2. Kuluttajalla on oikeus..."
-  ];
+  const sendMessage = useMutation({
+    mutationFn: async (formData: FormData) => {
+      if (!sessionId) throw new Error("No active session");
+      
+      const res = await fetch(`/api/v1/sessions/${sessionId}/chat`, {
+        method: "POST",
+        body: formData,
+      });
+      
+      if (!res.ok) {
+        const errorText = await res.text();
+        throw new Error(errorText || "Failed to send message");
+      }
+      
+      return res.json();
+    },
+    onMutate: (formData) => {
+      const question = formData.get('question') as string;
+      const userMessage: Message = {
+        role: "user",
+        content: question,
+        attachments: attachments.map(att => ({
+          filename: att.file.name,
+          contentType: att.file.type,
+          size: att.file.size,
+          type: att.file.type.startsWith('image/') ? 'image' : 'document',
+          url: att.preview
+        }))
+      };
+      setMessages(prev => [...prev, userMessage]);
+      setInput("");
+      setAttachments([]);
+    },
+    onSuccess: (data) => {
+      const newMessage: Message = {
+        role: "assistant",
+        content: data.answer,
+        sources: data.sources
+      };
+      setMessages(prev => [...prev.slice(0, -1), prev[prev.length - 1], newMessage]);
+      queryClient.invalidateQueries({ queryKey: [`/api/v1/sessions/${sessionId}`] });
+      queryClient.invalidateQueries({ queryKey: ["/api/v1/sessions"] });
+    },
+    onError: (error) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to send message. Please try again.",
+        variant: "destructive",
+      });
+      setMessages(prev => prev.slice(0, -1));
+    },
+  });
+
+  // Fetch suggestions when messages change
+  useEffect(() => {
+    if (messages.length > 0 && !sendMessage.isPending) {
+      fetch(`/api/v1/sessions/${sessionId}/suggestions`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          messages: messages.slice(-3).map(msg => ({
+            role: msg.role,
+            content: msg.content
+          }))
+        })
+      })
+      .then(res => res.json())
+      .then(data => setRecommendedPrompts(data.suggestions))
+      .catch(console.error);
+    }
+  }, [messages, sendMessage.isPending, sessionId]);
 
   // Scroll to bottom of messages
   const scrollToBottom = () => {
@@ -159,59 +226,6 @@ export function ChatInterface({ initialSessionId }: ChatInterfaceProps) {
     }
   }, [sessionData]);
 
-  const sendMessage = useMutation({
-    mutationFn: async (formData: FormData) => {
-      if (!sessionId) throw new Error("No active session");
-      
-      const res = await fetch(`/api/v1/sessions/${sessionId}/chat`, {
-        method: "POST",
-        body: formData,
-      });
-      
-      if (!res.ok) {
-        const errorText = await res.text();
-        throw new Error(errorText || "Failed to send message");
-      }
-      
-      return res.json();
-    },
-    onMutate: (formData) => {
-      const question = formData.get('question') as string;
-      const userMessage: Message = {
-        role: "user",
-        content: question,
-        attachments: attachments.map(att => ({
-          filename: att.file.name,
-          contentType: att.file.type,
-          size: att.file.size,
-          type: att.file.type.startsWith('image/') ? 'image' : 'document',
-          url: att.preview
-        }))
-      };
-      setMessages(prev => [...prev, userMessage]);
-      setInput("");
-      setAttachments([]);
-    },
-    onSuccess: (data) => {
-      const newMessage: Message = {
-        role: "assistant",
-        content: data.answer,
-        sources: data.sources
-      };
-      setMessages(prev => [...prev.slice(0, -1), prev[prev.length - 1], newMessage]);
-      queryClient.invalidateQueries({ queryKey: [`/api/v1/sessions/${sessionId}`] });
-      queryClient.invalidateQueries({ queryKey: ["/api/v1/sessions"] });
-    },
-    onError: (error) => {
-      toast({
-        title: "Error",
-        description: error.message || "Failed to send message. Please try again.",
-        variant: "destructive",
-      });
-      setMessages(prev => prev.slice(0, -1));
-    },
-  });
-
   const handleSubmit = () => {
     const trimmedInput = input.trim();
     if (!trimmedInput && attachments.length === 0) return;
@@ -265,12 +279,12 @@ export function ChatInterface({ initialSessionId }: ChatInterfaceProps) {
               <DialogTrigger asChild>
                 <Button variant="ghost" className="gap-2">
                   <Pencil className="h-4 w-4" />
-                  Rename Chat
+                  {sessionData?.title || 'New Chat'}
                 </Button>
               </DialogTrigger>
               <DialogContent>
                 <DialogHeader>
-                  <DialogTitle>Rename Chat</DialogTitle>
+                  <DialogTitle>{sessionData?.title || 'New Chat'}</DialogTitle>
                 </DialogHeader>
                 <form onSubmit={async (e) => {
                   e.preventDefault();
@@ -283,9 +297,8 @@ export function ChatInterface({ initialSessionId }: ChatInterfaceProps) {
                       body: JSON.stringify({ title: title.trim() }),
                     });
                     if (!res.ok) throw new Error('Failed to rename chat');
-                    const data = await res.json();
-                    queryClient.invalidateQueries({ queryKey: [`/api/v1/sessions/${sessionId}`] });
-                    queryClient.invalidateQueries({ queryKey: ['/api/v1/sessions'] });
+                    await queryClient.invalidateQueries({ queryKey: [`/api/v1/sessions/${sessionId}`] });
+                    await queryClient.invalidateQueries({ queryKey: ['/api/v1/sessions'] });
                     setShowRenameDialog(false);
                   } catch (error) {
                     toast({
@@ -297,7 +310,12 @@ export function ChatInterface({ initialSessionId }: ChatInterfaceProps) {
                 }} className="space-y-4 mt-4">
                   <div className="space-y-2">
                     <Label htmlFor="title">Title</Label>
-                    <Input id="title" name="title" placeholder="Enter chat title" />
+                    <Input 
+                      id="title" 
+                      name="title" 
+                      defaultValue={sessionData?.title}
+                      placeholder="Enter chat title" 
+                    />
                   </div>
                   <div className="flex justify-end">
                     <Button type="submit">Save</Button>
@@ -391,77 +409,37 @@ export function ChatInterface({ initialSessionId }: ChatInterfaceProps) {
               />
             ))}
             
-            <AnimatePresence>
-              <motion.div 
-                layout
-                className="flex flex-col items-end space-y-4 w-full"
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-              >
-                <motion.div 
-                  className="text-sm text-muted-foreground ml-auto mr-4"
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  transition={{ delay: 0.2 }}
-                >
-                  Tämä perustuu kuluttajansuojalakiin (1978/038) ja KKV:n ohjeistuksiin.
-                </motion.div>
-                
-                {recommendedPrompts.slice(0, 2).map((prompt, index) => (
-                  <motion.div
-                    key={index}
-                    initial={{ opacity: 0, x: 50 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    exit={{ opacity: 0, x: 50 }}
-                    transition={{ delay: 0.1 * (index + 1) }}
-                    onClick={() => {
-                      const formData = new FormData();
-                      formData.append('question', prompt);
-                      sendMessage.mutate(formData);
-                    }}
-                    className="bg-muted hover:bg-accent p-4 rounded-lg cursor-pointer transition-all duration-200 text-sm max-w-[80%] transform-gpu hover:scale-[1.02] ml-auto mr-4"
-                  >
-                    {prompt}
-                  </motion.div>
-                ))}
-                
-                {messages.length > 0 && (
-                  <motion.button
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: 20 }}
-                    transition={{ delay: 0.3 }}
-                    onClick={() => {
-                      if (messages.length > 0) {
-                        const lastUserMessage = messages[messages.length - 2];
-                        if (lastUserMessage?.role === 'user') {
-                          const formData = new FormData();
-                          formData.append('question', lastUserMessage.content);
-                          sendMessage.mutate(formData);
-                        }
-                      }
-                    }}
-                    className="ml-auto mr-4 flex items-center gap-2 p-3 text-sm bg-muted hover:bg-accent rounded-lg transition-all duration-200 transform-gpu hover:scale-[1.02]"
-                  >
-                    <svg
-                      xmlns="http://www.w3.org/2000/svg"
-                      viewBox="0 0 16 16"
-                      fill="none"
-                      className="h-4 w-4"
-                      stroke="currentColor"
+            {messages.length > 0 && recommendedPrompts.length > 0 && (
+              <div className="space-y-2 mt-6">
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <div className="h-px flex-1 bg-border/50"/>
+                  <span>Suggested Questions</span>
+                  <div className="h-px flex-1 bg-border/50"/>
+                </div>
+                <div className="grid grid-cols-1 gap-2">
+                  {recommendedPrompts.map((prompt, index) => (
+                    <motion.button
+                      key={index}
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: -10 }}
+                      transition={{ delay: 0.1 * index }}
+                      onClick={() => {
+                        const formData = new FormData();
+                        formData.append('question', prompt);
+                        sendMessage.mutate(formData);
+                      }}
+                      className="flex items-center gap-3 p-4 text-sm bg-card hover:bg-accent/10 shadow-sm hover:shadow rounded-lg transition-all duration-200 text-left w-full transform-gpu hover:translate-x-1"
                     >
-                      <path
-                        d="M13.5 8.5a5.5 5.5 0 1 1-.724-2.747l1.224.24"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                      />
-                    </svg>
-                    Regenerate response
-                  </motion.button>
-                )}
-              </motion.div>
-            </AnimatePresence>
+                      <div className="flex-shrink-0 w-6 h-6 rounded-full bg-primary/10 flex items-center justify-center">
+                        <span className="text-xs text-primary font-medium">{index + 1}</span>
+                      </div>
+                      <span className="flex-1 line-clamp-2">{prompt}</span>
+                    </motion.button>
+                  ))}
+                </div>
+              </div>
+            )}
             
             <div ref={messagesEndRef} />
           </div>

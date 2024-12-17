@@ -3,6 +3,7 @@ import { db } from '@db/index';
 import { sessions, queries, feedback } from '@db/schema';
 import { desc, eq, sql } from 'drizzle-orm';
 import { LegalService } from '../services/legal';
+import { OpenAIService } from '../services/openai';
 import { type ChatSession, type Query } from '../types/api';
 import multer from 'multer';
 import path from 'path';
@@ -45,9 +46,44 @@ export class ChatController {
     }
   });
   private legalService: LegalService;
+  private openAIService: OpenAIService;
 
   constructor() {
     this.legalService = new LegalService();
+    this.openAIService = new OpenAIService();
+  }
+
+  async getSuggestions(req: Request, res: Response) {
+    try {
+      const { messages } = req.body;
+      
+      if (!Array.isArray(messages) || !messages.every(m => 
+        typeof m === 'object' && 
+        (m.role === 'user' || m.role === 'assistant') && 
+        typeof m.content === 'string'
+      )) {
+        return res.status(400).json({
+          error: "Invalid messages format. Each message must have 'role' (user/assistant) and 'content' (string).",
+          code: "INVALID_INPUT"
+        });
+      }
+
+      const suggestions = await this.openAIService.generateChatSuggestions({ 
+        messages: messages.map(m => ({
+          role: m.role as 'user' | 'assistant',
+          content: m.content
+        }))
+      });
+
+      res.json({ suggestions });
+    } catch (error) {
+      console.error('Error generating suggestions:', error);
+      res.status(500).json({
+        error: "Failed to generate suggestions",
+        code: "SUGGESTIONS_ERROR",
+        details: error instanceof Error ? error.message : 'Unknown error'
+      });
+    }
   }
 
   async createSession(req: Request, res: Response) {
