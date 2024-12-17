@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { OpenAIService } from './openai';
 
 interface FinlexDocument {
   identifier: string;
@@ -19,6 +20,10 @@ interface KKVGuideline {
 export class LegalService {
   private static FINLEX_BASE_URL = 'https://data.finlex.fi/api/v1';
   private static KKV_BASE_URL = 'https://www.kkv.fi/api';
+  private openAIService: OpenAIService;
+
+  constructor() {
+    this.openAIService = new OpenAIService();
 
   /**
    * Search relevant legal documents from Finlex
@@ -69,53 +74,61 @@ export class LegalService {
    * Analyze legal context and provide relevant citations
    */
   async analyzeLegalContext(query: string) {
-    const [finlexDocs, kkvGuidelines] = await Promise.all([
-      this.searchFinlex(query),
-      this.searchKKVGuidelines(query)
-    ]);
+    try {
+      // Fetch relevant documents and guidelines
+      const [finlexDocs, kkvGuidelines] = await Promise.all([
+        this.searchFinlex(query),
+        this.searchKKVGuidelines(query)
+      ]);
 
-    const sources = [
-      ...finlexDocs.map(doc => ({
-        link: `https://finlex.fi/fi/laki/ajantasa/${doc.identifier.replace('/', '')}`,
-        title: doc.title,
-        section: doc.sections[0]?.identifier,
-        type: 'finlex' as const,
-        identifier: doc.identifier,
-        relevance: 0.9 // TODO: Implement proper relevance scoring
-      })),
-      ...kkvGuidelines.map(guide => ({
-        link: guide.link,
-        title: guide.title,
-        type: 'kkv' as const,
-        relevance: 0.8
-      }))
-    ];
+      // Prepare context for OpenAI
+      const relevantSections = finlexDocs
+        .flatMap(doc => doc.sections)
+        .map(section => `${section.identifier}: ${section.content}`);
 
-    // TODO: Implement proper legal analysis using LLM
-    const legalContext = `According to Finnish consumer protection law...`;
-    const confidence = {
-      score: 0.85,
-      reasoning: "Based on direct references from Consumer Protection Act..."
-    };
+      // Get AI-generated response
+      const [legalResponse, contextAnalysis] = await Promise.all([
+        this.openAIService.generateLegalResponse(query),
+        this.openAIService.analyzeLegalContext(query, relevantSections)
+      ]);
 
-    return {
-      answer: this.generateLegalResponse(query, finlexDocs, kkvGuidelines),
-      sources,
-      legalContext,
-      confidence
-    };
+      // Merge AI response with document sources
+      const sources = [
+        ...(legalResponse.sources || []),
+        ...finlexDocs.map(doc => ({
+          link: `https://finlex.fi/fi/laki/ajantasa/${doc.identifier.replace('/', '')}`,
+          title: doc.title,
+          section: doc.sections[0]?.identifier,
+          type: 'finlex' as const,
+          identifier: doc.identifier,
+          relevance: 0.9
+        })),
+        ...kkvGuidelines.map(guide => ({
+          link: guide.link,
+          title: guide.title,
+          type: 'kkv' as const,
+          relevance: 0.8
+        }))
+      ];
+
+      return {
+        answer: legalResponse.answer,
+        sources: sources,
+        legalContext: contextAnalysis.context,
+        confidence: legalResponse.confidence
+      };
+    } catch (error) {
+      console.error('Error in analyzeLegalContext:', error);
+      throw new Error('Failed to analyze legal context');
+    }
   }
 
-  private generateLegalResponse(
+  private async generateLegalResponse(
     query: string,
     finlexDocs: FinlexDocument[],
     kkvGuidelines: KKVGuideline[]
-  ): string {
-    // TODO: Enhance response generation with proper legal analysis
-    return `Suomen lain mukaan kuluttajalla on seuraavat oikeudet:
-1. ${finlexDocs[0]?.sections[0]?.content || ''}
-2. ${kkvGuidelines[0]?.content || ''}
-
-Tämä perustuu kuluttajansuojalakiin (${finlexDocs[0]?.identifier || ''}) ja KKV:n ohjeistuksiin.`;
+  ): Promise<string> {
+    const response = await this.openAIService.generateLegalResponse(query);
+    return response.answer;
   }
 }
