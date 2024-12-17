@@ -7,8 +7,21 @@ export function Sidebar() {
   const [location] = useLocation();
 
   const mainLinks = [
-    { href: "/", icon: MessageSquare, label: "Chat" },
-    { href: "/history", icon: History, label: "History" },
+    { 
+      href: "/", 
+      icon: MessageSquare, 
+      label: "Chat",
+    },
+    { 
+      href: "/history", 
+      icon: History, 
+      label: "History"
+    },
+    { 
+      href: "/legal", 
+      icon: FileText, 
+      label: "Legal Documents"
+    },
   ];
 
   return (
@@ -16,37 +29,42 @@ export function Sidebar() {
       <nav className="space-y-2">
         {mainLinks.map((link) => {
           const Icon = link.icon;
+          const isActive = location === link.href || 
+            (link.subItems?.some(item => location === item.href));
+
           return (
-            <Link key={link.href} href={link.href}>
-              <Button
-                variant={location === link.href ? "secondary" : "ghost"}
-                className={cn(
-                  "w-full justify-start gap-2",
-                  location === link.href && "bg-secondary"
-                )}
-              >
-                <Icon className="h-4 w-4" />
-                {link.label}
-              </Button>
-            </Link>
+            <div key={link.href} className="space-y-1">
+              <Link href={link.href}>
+                <Button
+                  variant={isActive ? "secondary" : "ghost"}
+                  className={cn(
+                    "w-full justify-start gap-2",
+                    isActive && "bg-secondary"
+                  )}
+                >
+                  <Icon className="h-4 w-4" />
+                  {link.label}
+                </Button>
+              </Link>
+              
+              {link.subItems?.map((subItem) => (
+                <Link key={subItem.href} href={subItem.href}>
+                  <Button
+                    variant={location === subItem.href ? "secondary" : "ghost"}
+                    className={cn(
+                      "w-full justify-start gap-2 pl-8",
+                      location === subItem.href && "bg-secondary"
+                    )}
+                  >
+                    <subItem.icon className="h-4 w-4" />
+                    {subItem.label}
+                  </Button>
+                </Link>
+              ))}
+            </div>
           );
         })}
       </nav>
-      
-      <div className="mt-4 pt-4 border-t">
-        <Link href="/presets">
-          <Button
-            variant={location === "/presets" ? "secondary" : "ghost"}
-            className={cn(
-              "w-full justify-start gap-2",
-              location === "/presets" && "bg-secondary"
-            )}
-          >
-            <FileText className="h-4 w-4" />
-            Legal Documents
-          </Button>
-        </Link>
-      </div>
     </aside>
   );
 }

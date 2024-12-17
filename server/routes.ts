@@ -3,12 +3,14 @@ import { createServer, type Server } from "http";
 import { LegalController } from "./controllers/legal.controller";
 import { DocumentsController } from "./controllers/documents.controller";
 import { ChatController } from "./controllers/chat.controller";
+import { TemplatesController } from "./controllers/templates.controller";
 
 export function registerRoutes(app: Express): Server {
   // Initialize controllers
   const legalController = new LegalController();
   const documentsController = new DocumentsController();
   const chatController = new ChatController();
+  const templatesController = new TemplatesController();
 
   // API Version prefix
   const apiV1 = '/api/v1';
@@ -22,6 +24,10 @@ export function registerRoutes(app: Express): Server {
   app.get(`${apiV1}/documents/recent`, (req, res) => documentsController.getRecent(req, res));
   app.get(`${apiV1}/documents/popular`, (req, res) => documentsController.getPopular(req, res));
   app.get(`${apiV1}/documents/categories`, (req, res) => documentsController.getCategories(req, res));
+
+  // Template routes
+  app.get(`${apiV1}/templates`, (req, res) => templatesController.getTemplates(req, res));
+  app.get(`${apiV1}/templates/:id`, (req, res) => templatesController.getTemplate(req, res));
 
   // Chat routes - ensure these are after API prefix
   // Chat session routes

@@ -15,7 +15,7 @@ function App() {
           <Switch>
             <Route path="/" component={Home} />
             <Route path="/history" component={History} />
-            <Route path="/presets" component={LegalPresetsPage} />
+            <Route path="/legal" component={LegalPresetsPage} />
             <Route>404 - Not Found</Route>
           </Switch>
         </main>

@@ -1,6 +1,6 @@
 import { Request, Response } from 'express';
 import { db } from '@db/index';
-import { chatSessions, queries } from '@db/schema';
+import { sessions, queries, feedback } from '@db/schema';
 import { desc, eq, sql } from 'drizzle-orm';
 import { LegalService } from '../services/legal';
 import { type ChatSession, type Query } from '../types/api';
@@ -55,7 +55,7 @@ export class ChatController {
       console.log('Creating new chat session...');
       
       // Create session using Drizzle ORM
-      const [session] = await db.insert(chatSessions)
+      const [session] = await db.insert(sessions)
         .values({
           title: 'New Chat',
           createdAt: new Date()
@@ -91,8 +91,8 @@ export class ChatController {
 
   async getSessions(req: Request, res: Response) {
     try {
-      const sessions = await db.query.chatSessions.findMany({
-        orderBy: [desc(chatSessions.createdAt)],
+      const results = await db.query.sessions.findMany({
+        orderBy: [desc(sessions.createdAt)],
         with: {
           queries: {
             limit: 1,
@@ -111,28 +111,24 @@ export class ChatController {
 
   async getSession(req: Request, res: Response) {
     try {
-      const session = await db.query.chatSessions.findFirst({
-        where: eq(chatSessions.id, parseInt(req.params.id)),
-        with: {
-          queries: {
-            orderBy: [queries.createdAt]
-          }
-        }
-      });
+      const session = await db.select()
+        .from(sessions)
+        .where(eq(sessions.id, parseInt(req.params.id)))
+        .leftJoin(queries, eq(queries.sessionId, sessions.id));
       
-      if (!session) {
+      if (!session || session.length === 0) {
         return res.status(404).json({ 
           error: "Chat session not found",
           code: "NOT_FOUND"
         });
       }
 
+      const sessionData = session[0].sessions;
+      const queryList = session.map(s => s.queries).filter(q => q !== null);
+      
       const fullSession = {
-        ...session,
-        queries: session.queries.map(q => ({
-          ...q,
-          sources: q.sources || []
-        }))
+        ...sessionData,
+        queries: queryList
       };
       
       res.json(fullSession);
