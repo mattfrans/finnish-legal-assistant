@@ -214,9 +214,18 @@ export function History() {
                     </DialogTrigger>
                     <DialogContent>
                       <DialogHeader>
-                        <DialogTitle>Rename Chat</DialogTitle>
+                        <DialogTitle>{session.title || 'New Chat'}</DialogTitle>
                       </DialogHeader>
-                      <RenameChatDialog session={session} onClose={() => {}} />
+                      <RenameChatDialog 
+                        session={session} 
+                        onClose={(e: Event) => {
+                          e?.preventDefault();
+                          const dialogTrigger = document.querySelector('[data-state="open"]');
+                          if (dialogTrigger instanceof HTMLButtonElement) {
+                            dialogTrigger.click();
+                          }
+                        }} 
+                      />
                     </DialogContent>
                   </Dialog>
                   <Button
