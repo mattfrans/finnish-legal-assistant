@@ -41,9 +41,13 @@ export function Sidebar() {
         minSize={0}
         maxSize={20}
         collapsible
+        collapsedSize={0}
         onCollapse={() => setIsCollapsed(true)}
         onExpand={() => setIsCollapsed(false)}
-        className="border-r bg-muted/30"
+        className={cn(
+          "border-r bg-muted/30 transition-all duration-300",
+          isCollapsed && "w-0 border-r-0"
+        )}
       >
         <div className={cn(
           "h-full transition-all duration-300 ease-in-out",

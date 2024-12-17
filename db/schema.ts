@@ -70,6 +70,18 @@ export const queries = pgTable('queries', {
   sessionId: integer('session_id').references(() => sessions.id, { onDelete: 'cascade' }).notNull(),
   question: text('question').notNull(),
   answer: text('answer').notNull(),
+  sources: json('sources').$type<Array<{
+    title: string;
+    link: string;
+    section?: string;
+    type: 'finlex' | 'kkv' | 'other';
+    identifier?: string;
+    relevance: number;
+  }>>().default([]).notNull(),
+  confidence: json('confidence').$type<{
+    score: number;
+    reasoning: string;
+  }>().notNull(),
   createdAt: timestamp('created_at').defaultNow().notNull()
 });
 

@@ -416,7 +416,7 @@ export function ChatInterface({ initialSessionId }: ChatInterfaceProps) {
               <div className="space-y-2 mt-6">
                 <div className="flex items-center gap-2 text-sm text-muted-foreground">
                   <div className="h-px flex-1 bg-border/50"/>
-                  <span>Suggested Questions</span>
+                  <span>Follow-up Questions</span>
                   <div className="h-px flex-1 bg-border/50"/>
                 </div>
                 <div className="grid grid-cols-1 gap-2">
@@ -430,14 +430,18 @@ export function ChatInterface({ initialSessionId }: ChatInterfaceProps) {
                       onClick={() => {
                         const formData = new FormData();
                         formData.append('question', prompt);
+                        formData.append('languageMode', languageMode);
                         sendMessage.mutate(formData);
                       }}
-                      className="flex items-center gap-3 p-4 text-sm bg-card hover:bg-accent/10 shadow-sm hover:shadow rounded-lg transition-all duration-200 text-left w-full transform-gpu hover:translate-x-1"
+                      className="flex items-center gap-3 p-4 text-sm bg-card/50 hover:bg-accent/5 shadow-sm hover:shadow-md rounded-lg transition-all duration-200 text-left w-full transform-gpu hover:translate-x-1 border border-border/20 hover:border-border/40"
                     >
-                      <div className="flex-shrink-0 w-6 h-6 rounded-full bg-primary/10 flex items-center justify-center">
-                        <span className="text-xs text-primary font-medium">{index + 1}</span>
+                      <div className="flex-shrink-0 w-8 h-8 rounded-full bg-primary/5 flex items-center justify-center">
+                        <span className="text-xs text-primary/80 font-medium">{index + 1}</span>
                       </div>
-                      <span className="flex-1 line-clamp-2">{prompt}</span>
+                      <div className="flex-1 space-y-1">
+                        <span className="line-clamp-2 text-sm font-medium">{prompt}</span>
+                        <span className="text-xs text-muted-foreground">Click to ask this follow-up question</span>
+                      </div>
                     </motion.button>
                   ))}
                 </div>
