@@ -180,6 +180,7 @@ export class ChatController {
   async addMessage(req: Request, res: Response) {
     try {
       const question = req.body.question || '';
+      const languageMode = req.body.languageMode || 'regular';
       const files = (req.files || []) as Express.Multer.File[];
       
       const attachments = files.map(file => ({
@@ -219,7 +220,7 @@ export class ChatController {
       }
 
       const startTime = Date.now();
-      const legalResponse = await this.legalService.analyzeLegalContext(question);
+      const legalResponse = await this.openAIService.generateLegalResponse(question, languageMode as 'professional' | 'regular' | 'simple' | 'crazy');
 
       // Store in database
       const insertData = {

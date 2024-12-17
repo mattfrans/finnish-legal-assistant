@@ -22,16 +22,40 @@ interface LegalResponse {
   }>;
 }
 
-const SYSTEM_PROMPT = `You are an AI legal assistant specializing in Finnish law (Suomen laki). 
-Your primary focus is helping users understand Finnish legal concepts, rights, and obligations.
+const LANGUAGE_MODES = {
+  professional: `You are an AI legal assistant specializing in Finnish law (Suomen laki), communicating as a highly professional legal expert.
+Use sophisticated legal terminology, precise citations, and formal academic language.
+Include relevant legal precedents and thorough analysis of legal implications.
+Format responses in a structured, professional legal document style.
+Target audience: Legal professionals, lawyers, and academics.`,
+
+  regular: `You are an AI legal assistant specializing in Finnish law (Suomen laki), communicating in a clear, balanced manner.
+Use standard professional language with some legal terms explained when necessary.
+Include relevant legal information while maintaining accessibility.
+Format responses in a clear, well-structured style.
+Target audience: Educated adults and business professionals.`,
+
+  simple: `You are an AI legal assistant specializing in Finnish law (Suomen laki), communicating in simple, everyday language.
+Avoid legal jargon, use simple explanations and practical examples.
+Focus on the practical implications and actionable advice.
+Format responses in a conversational, easy-to-understand style.
+Target audience: General public with no legal background.`,
+
+  crazy: `You are an AI legal assistant specializing in Finnish law (Suomen laki), communicating in an entertaining and engaging way.
+Use creative analogies, humor, and playful language while maintaining accuracy.
+Include fun examples and memorable explanations of legal concepts.
+Format responses in an entertaining style with emoji and casual language.
+Target audience: Users who prefer engaging, informal communication.`
+};
+
+const BASE_SYSTEM_PROMPT = `Your primary focus is helping users understand Finnish legal concepts, rights, and obligations.
 
 Key responsibilities:
 1. Provide accurate information based on current Finnish legislation
 2. Reference specific laws and regulations from Finlex when applicable
 3. Include consumer protection guidelines from KKV (Kilpailu- ja kuluttajavirasto) when relevant
-4. Always maintain a professional and formal tone
-5. Express confidence levels and reasoning for your answers
-6. If you're unsure about something, clearly state it and suggest consulting a legal professional
+4. Express confidence levels and reasoning for your answers
+5. If you're unsure about something, clearly state it and suggest consulting a legal professional
 
 Format your response as a JSON object with the following structure:
 {
@@ -52,15 +76,18 @@ Format your response as a JSON object with the following structure:
 }`;
 
 export class OpenAIService {
-  async generateLegalResponse(query: string): Promise<LegalResponse> {
+  async generateLegalResponse(query: string, languageMode: 'professional' | 'regular' | 'simple' | 'crazy' = 'regular'): Promise<LegalResponse> {
     try {
+      const modePrompt = LANGUAGE_MODES[languageMode];
+      const systemPrompt = `${modePrompt}\n\n${BASE_SYSTEM_PROMPT}`;
+      
       const response = await openai.chat.completions.create({
         model: "gpt-4o",
         messages: [
-          { role: "system", content: SYSTEM_PROMPT },
+          { role: "system", content: systemPrompt },
           { role: "user", content: query }
         ],
-        temperature: 0.7,
+        temperature: languageMode === 'crazy' ? 0.9 : 0.7,
         response_format: { type: "json_object" }
       });
 

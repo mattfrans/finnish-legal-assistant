@@ -86,6 +86,9 @@ export function ChatInterface({ initialSessionId }: ChatInterfaceProps) {
     mutationFn: async (formData: FormData) => {
       if (!sessionId) throw new Error("No active session");
       
+      // Add language mode to form data
+      formData.append('languageMode', languageMode);
+      
       const res = await fetch(`/api/v1/sessions/${sessionId}/chat`, {
         method: "POST",
         body: formData,
