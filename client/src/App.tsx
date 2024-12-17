@@ -4,21 +4,40 @@ import { History } from "@/pages/History";
 import { LegalPresetsPage } from "@/pages/LegalPresetsPage";
 import { Header } from "@/components/layout/Header";
 import { Sidebar } from "@/components/layout/Sidebar";
+import { 
+  PanelGroup, 
+  Panel
+} from "react-resizable-panels";
+
+function ResizeHandle() {
+  return (
+    <div className="w-1.5 bg-border/10 hover:bg-border/20 transition-colors cursor-col-resize" />
+  );
+}
 
 function App() {
   return (
     <div className="h-screen flex flex-col">
       <Header />
-      <div className="flex flex-1 overflow-hidden">
-        <Sidebar />
-        <main className="flex-1 overflow-y-auto bg-[#f5f3f0]">
-          <Switch>
-            <Route path="/" component={Home} />
-            <Route path="/history" component={History} />
-            <Route path="/legal" component={LegalPresetsPage} />
-            <Route>404 - Not Found</Route>
-          </Switch>
-        </main>
+      <div className="flex-1 overflow-hidden">
+        <PanelGroup direction="horizontal" className="h-full">
+          <Panel defaultSize={20} minSize={0} maxSize={30} collapsible>
+            <div className="h-full">
+              <Sidebar />
+            </div>
+          </Panel>
+          <ResizeHandle />
+          <Panel minSize={70}>
+            <main className="h-full overflow-y-auto bg-[#f5f3f0]">
+              <Switch>
+                <Route path="/" component={Home} />
+                <Route path="/history" component={History} />
+                <Route path="/legal" component={LegalPresetsPage} />
+                <Route>404 - Not Found</Route>
+              </Switch>
+            </main>
+          </Panel>
+        </PanelGroup>
       </div>
     </div>
   );

@@ -271,7 +271,7 @@ export function ChatInterface({ initialSessionId }: ChatInterfaceProps) {
   }
 
   return (
-    <div className="flex flex-col h-full max-w-4xl mx-auto">
+    <div className="flex flex-col h-full w-full overflow-hidden">
       {sessionId && (
         <div className="p-4 border-b flex items-center justify-between">
           <div className="flex items-center gap-2">

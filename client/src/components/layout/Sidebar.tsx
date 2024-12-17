@@ -1,12 +1,22 @@
 import { Link, useLocation } from "wouter";
-import { MessageSquare, History, FileText } from "lucide-react";
+import { MessageSquare, History, FileText, PanelLeftClose, PanelLeft } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
+import { Panel, PanelGroup } from "react-resizable-panels";
+import { useState } from "react";
+import type { LucideIcon } from "lucide-react";
+
+interface NavLink {
+  href: string;
+  icon: LucideIcon;
+  label: string;
+}
 
 export function Sidebar() {
   const [location] = useLocation();
+  const [isCollapsed, setIsCollapsed] = useState(false);
 
-  const mainLinks = [
+  const mainLinks: NavLink[] = [
     { 
       href: "/", 
       icon: MessageSquare, 
@@ -25,46 +35,64 @@ export function Sidebar() {
   ];
 
   return (
-    <aside className="w-64 border-r bg-muted/30 p-4 flex-shrink-0 flex flex-col">
-      <nav className="space-y-2">
-        {mainLinks.map((link) => {
-          const Icon = link.icon;
-          const isActive = location === link.href || 
-            (link.subItems?.some(item => location === item.href));
+    <PanelGroup direction="horizontal">
+      <Panel 
+        defaultSize={20} 
+        minSize={0}
+        maxSize={20}
+        collapsible
+        onCollapse={() => setIsCollapsed(true)}
+        onExpand={() => setIsCollapsed(false)}
+        className="border-r bg-muted/30"
+      >
+        <div className={cn(
+          "h-full transition-all duration-300 ease-in-out",
+          isCollapsed ? "w-12" : "w-64"
+        )}>
+          <div className="flex items-center justify-end p-2">
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => setIsCollapsed(!isCollapsed)}
+              className="h-8 w-8"
+            >
+              {isCollapsed ? (
+                <PanelLeft className="h-4 w-4" />
+              ) : (
+                <PanelLeftClose className="h-4 w-4" />
+              )}
+            </Button>
+          </div>
+          
+          <nav className={cn(
+            "space-y-2 p-2",
+            isCollapsed && "px-1"
+          )}>
+            {mainLinks.map((link) => {
+              const Icon = link.icon;
+              const isActive = location === link.href;
 
-          return (
-            <div key={link.href} className="space-y-1">
-              <Link href={link.href}>
-                <Button
-                  variant={isActive ? "secondary" : "ghost"}
-                  className={cn(
-                    "w-full justify-start gap-2",
-                    isActive && "bg-secondary"
-                  )}
-                >
-                  <Icon className="h-4 w-4" />
-                  {link.label}
-                </Button>
-              </Link>
-              
-              {link.subItems?.map((subItem) => (
-                <Link key={subItem.href} href={subItem.href}>
-                  <Button
-                    variant={location === subItem.href ? "secondary" : "ghost"}
-                    className={cn(
-                      "w-full justify-start gap-2 pl-8",
-                      location === subItem.href && "bg-secondary"
-                    )}
-                  >
-                    <subItem.icon className="h-4 w-4" />
-                    {subItem.label}
-                  </Button>
-                </Link>
-              ))}
-            </div>
-          );
-        })}
-      </nav>
-    </aside>
+              return (
+                <div key={link.href} className="space-y-1">
+                  <Link href={link.href}>
+                    <Button
+                      variant={isActive ? "secondary" : "ghost"}
+                      className={cn(
+                        "w-full justify-start gap-2",
+                        isActive && "bg-secondary",
+                        isCollapsed && "px-2"
+                      )}
+                    >
+                      <Icon className="h-4 w-4 flex-shrink-0" />
+                      {!isCollapsed && <span>{link.label}</span>}
+                    </Button>
+                  </Link>
+                </div>
+              );
+            })}
+          </nav>
+        </div>
+      </Panel>
+    </PanelGroup>
   );
 }
