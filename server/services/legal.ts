@@ -24,10 +24,8 @@ export class LegalService {
 
   constructor() {
     this.openAIService = new OpenAIService();
+  }
 
-  /**
-   * Search relevant legal documents from Finlex
-   */
   async searchFinlex(query: string): Promise<FinlexDocument[]> {
     try {
       // TODO: Replace with actual Finlex API integration
@@ -51,9 +49,6 @@ export class LegalService {
     }
   }
 
-  /**
-   * Search KKV consumer guidelines
-   */
   async searchKKVGuidelines(query: string): Promise<KKVGuideline[]> {
     try {
       // TODO: Replace with actual KKV API integration
@@ -70,9 +65,6 @@ export class LegalService {
     }
   }
 
-  /**
-   * Analyze legal context and provide relevant citations
-   */
   async analyzeLegalContext(query: string) {
     try {
       // Fetch relevant documents and guidelines
@@ -121,14 +113,5 @@ export class LegalService {
       console.error('Error in analyzeLegalContext:', error);
       throw new Error('Failed to analyze legal context');
     }
-  }
-
-  private async generateLegalResponse(
-    query: string,
-    finlexDocs: FinlexDocument[],
-    kkvGuidelines: KKVGuideline[]
-  ): Promise<string> {
-    const response = await this.openAIService.generateLegalResponse(query);
-    return response.answer;
   }
 }

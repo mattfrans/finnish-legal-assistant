@@ -156,9 +156,10 @@ export class ChatController {
       const sessionId = parseInt(req.params.id);
 
       // Verify session exists
-      const session = await db.query.chatSessions.findFirst({
-        where: eq(chatSessions.id, sessionId)
-      });
+      const [session] = await db.select()
+        .from(sessions)
+        .where(eq(sessions.id, sessionId))
+        .limit(1);
 
       if (!session) {
         return res.status(404).json({ 
@@ -176,9 +177,9 @@ export class ChatController {
         const truncatedTitle = question.length > 50 
           ? question.substring(0, 47) + "..."
           : question;
-        await db.update(chatSessions)
+        await db.update(sessions)
           .set({ title: truncatedTitle })
-          .where(eq(chatSessions.id, sessionId));
+          .where(eq(sessions.id, sessionId));
       }
 
       const startTime = Date.now();
@@ -277,12 +278,12 @@ export class ChatController {
         });
       }
 
-      const [session] = await db.update(chatSessions)
+      const [session] = await db.update(sessions)
         .set({ 
           title: title.trim(),
           updatedAt: new Date()
         })
-        .where(eq(chatSessions.id, sessionId))
+        .where(eq(sessions.id, sessionId))
         .returning();
 
       if (!session) {
@@ -307,12 +308,12 @@ export class ChatController {
       const { isPinned } = req.body;
       const sessionId = parseInt(req.params.id);
 
-      const [session] = await db.update(chatSessions)
+      const [session] = await db.update(sessions)
         .set({ 
           isPinned: isPinned,
           updatedAt: new Date()
         })
-        .where(eq(chatSessions.id, sessionId))
+        .where(eq(sessions.id, sessionId))
         .returning();
 
       if (!session) {
@@ -336,8 +337,8 @@ export class ChatController {
     try {
       const sessionId = parseInt(req.params.id);
 
-      const [session] = await db.delete(chatSessions)
-        .where(eq(chatSessions.id, sessionId))
+      const [session] = await db.delete(sessions)
+        .where(eq(sessions.id, sessionId))
         .returning();
 
       if (!session) {
