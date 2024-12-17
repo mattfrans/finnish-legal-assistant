@@ -2,6 +2,7 @@ import { Switch, Route } from "wouter";
 import { Home } from "@/pages/Home";
 import { History } from "@/pages/History";
 import { LegalPresetsPage } from "@/pages/LegalPresetsPage";
+import { PricingPage } from "@/pages/PricingPage";
 import { Header } from "@/components/layout/Header";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { 
@@ -42,6 +43,7 @@ function App() {
                 <Route path="/" component={Home} />
                 <Route path="/history" component={History} />
                 <Route path="/legal" component={LegalPresetsPage} />
+                <Route path="/pricing" component={PricingPage} />
                 <Route>404 - Not Found</Route>
               </Switch>
             </main>

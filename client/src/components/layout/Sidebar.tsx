@@ -32,6 +32,11 @@ export function Sidebar() {
       icon: FileText, 
       label: "Legal Documents"
     },
+    {
+      href: "/pricing",
+      icon: FileText,
+      label: "Pricing"
+    },
   ];
 
   return (
