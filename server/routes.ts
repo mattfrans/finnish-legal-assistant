@@ -4,6 +4,7 @@ import { LegalController } from "./controllers/legal.controller";
 import { DocumentsController } from "./controllers/documents.controller";
 import { ChatController } from "./controllers/chat.controller";
 import { TemplatesController } from "./controllers/templates.controller";
+import { LegalService } from "./services/legal";
 
 export function registerRoutes(app: Express): Server {
   // Initialize controllers
@@ -14,6 +15,31 @@ export function registerRoutes(app: Express): Server {
 
   // API Version prefix
   const apiV1 = '/api/v1';
+
+  // Contextual Help routes
+  app.post(`${apiV1}/contextual-help`, async (req, res) => {
+    try {
+      const { message, context, history } = req.body;
+      const legalService = new LegalService();
+      
+      // Generate contextual help based on page context
+      const response = await legalService.analyzeLegalContext(
+        message || `Generate helpful information about ${context.title}: ${context.description}`
+      );
+      
+      res.json({
+        content: response.answer,
+        sources: response.sources
+      });
+    } catch (error: unknown) {
+      console.error('Error in contextual help:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      res.status(500).json({
+        error: 'Failed to generate contextual help',
+        details: process.env.NODE_ENV === 'development' ? errorMessage : undefined
+      });
+    }
+  });
 
   // Legal routes
   app.get(`${apiV1}/legal/search`, (req, res) => legalController.search(req, res));
