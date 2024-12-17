@@ -127,38 +127,65 @@ export function MessageBubble({ message }: MessageProps) {
             )}
             
             {message.sources && message.sources.length > 0 && (
-              <div>
-                <p className="text-sm font-medium mb-2">Legal Sources:</p>
-                <ul className="space-y-2">
+              <div className="mt-4 border-t border-border/50 pt-4">
+                <div className="flex items-center gap-2 mb-3">
+                  <p className="text-sm font-medium">Legal Sources</p>
+                  <span className="text-xs text-muted-foreground">
+                    ({message.sources.length} {message.sources.length === 1 ? 'source' : 'sources'})
+                  </span>
+                </div>
+                <ul className="space-y-3">
                   {message.sources
                     .sort((a, b) => b.relevance - a.relevance)
                     .map((source, i) => (
-                    <li key={i} className="text-sm flex items-center gap-2">
-                      <ExternalLink className="h-4 w-4 flex-shrink-0" />
-                      <div>
-                        <a 
-                          href={source.link}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="hover:underline flex items-center gap-2"
-                        >
-                          {source.title}
-                          {source.type && (
-                            <span className={`px-1.5 py-0.5 rounded-full text-xs ${
-                              source.type === 'finlex' ? 'bg-blue-100 text-blue-800' :
-                              source.type === 'kkv' ? 'bg-purple-100 text-purple-800' :
-                              'bg-gray-100 text-gray-800'
-                            }`}>
-                              {source.type.toUpperCase()}
-                            </span>
+                    <li 
+                      key={i} 
+                      className="bg-background/50 rounded-lg p-3 hover:bg-background/80 transition-colors"
+                    >
+                      <div className="flex items-start gap-3">
+                        <ExternalLink className="h-4 w-4 flex-shrink-0 mt-1 text-muted-foreground" />
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <a 
+                              href={source.link}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="hover:underline font-medium text-sm"
+                            >
+                              {source.title}
+                            </a>
+                            <div className="flex items-center gap-2">
+                              {source.type && (
+                                <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
+                                  source.type === 'finlex' ? 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200' :
+                                  source.type === 'kkv' ? 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200' :
+                                  'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-200'
+                                }`}>
+                                  {source.type.toUpperCase()}
+                                </span>
+                              )}
+                              <span 
+                                className="text-xs text-muted-foreground px-2 py-0.5 rounded-full bg-muted"
+                                title="Source relevance score"
+                              >
+                                {Math.round(source.relevance * 100)}% relevant
+                              </span>
+                            </div>
+                          </div>
+                          {(source.section || source.identifier) && (
+                            <p className="text-muted-foreground text-sm mt-1">
+                              {source.section}
+                              {source.identifier && (
+                                <>
+                                  {source.section && " - "}
+                                  <span className="font-mono text-xs bg-muted px-1.5 py-0.5 rounded">
+                                    {source.identifier}
+                                  </span>
+                                </>
+                              )}
+                            </p>
                           )}
-                        </a>
-                        {source.section && (
-                          <p className="text-muted-foreground text-xs mt-0.5">
-                            {source.section}
-                            {source.identifier && ` (${source.identifier})`}
-                          </p>
-                        )}
+                        </div>
                       </div>
                     </li>
                   ))}
