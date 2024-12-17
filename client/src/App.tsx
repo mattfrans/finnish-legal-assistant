@@ -21,13 +21,22 @@ function App() {
       <Header />
       <div className="flex-1 overflow-hidden">
         <PanelGroup direction="horizontal" className="h-full">
-          <Panel defaultSize={20} minSize={0} maxSize={30} collapsible>
+          <Panel 
+            defaultSize={20} 
+            minSize={0} 
+            maxSize={30} 
+            collapsible
+          >
             <div className="h-full">
               <Sidebar />
             </div>
           </Panel>
           <ResizeHandle />
-          <Panel minSize={70}>
+          <Panel 
+            defaultSize={80}
+            minSize={70} 
+            className="transition-all duration-300"
+          >
             <main className="h-full overflow-y-auto bg-[#f5f3f0]">
               <Switch>
                 <Route path="/" component={Home} />
