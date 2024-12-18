@@ -175,6 +175,16 @@ export function FilePreview({ file, url }: FilePreviewProps) {
                         file={url}
                         onLoadSuccess={onDocumentLoadSuccess}
                         className="mx-auto"
+                        error={
+                          <div className="p-4 text-center text-muted-foreground">
+                            <p>Error loading PDF. Please try again.</p>
+                          </div>
+                        }
+                        loading={
+                          <div className="p-4 text-center text-muted-foreground">
+                            <p>Loading PDF...</p>
+                          </div>
+                        }
                       >
                         <Page 
                           pageNumber={pageNumber} 
@@ -183,6 +193,11 @@ export function FilePreview({ file, url }: FilePreviewProps) {
                           width={window.innerWidth * 0.5}
                           renderTextLayer
                           renderAnnotationLayer
+                          error={
+                            <div className="p-4 text-center text-muted-foreground">
+                              <p>Error loading page. Please try again.</p>
+                            </div>
+                          }
                         />
                       </Document>
                     </div>
