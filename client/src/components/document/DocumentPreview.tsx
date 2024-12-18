@@ -56,10 +56,16 @@ export function DocumentPreview() {
   }, []);
 
   const handleItemClick = (item: PreviewItem) => {
-    setActiveItem(item);
-    if (item.data.url) {
-      window.open(item.data.url, '_blank');
-    }
+    if (!item.data.url) {
+        // If no URL is provided, show the item details in the preview pane
+        setActiveItem(item);
+      } else if (item.data.type === 'citation') {
+        // For citations, open the URL in a new tab
+        window.open(item.data.url, '_blank');
+      } else {
+        // For documents, show them in the preview pane
+        setActiveItem(item);
+      }
   };
 
   if (isMinimized) {
