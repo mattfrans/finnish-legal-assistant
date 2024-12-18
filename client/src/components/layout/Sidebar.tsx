@@ -1,5 +1,5 @@
 import { Link, useLocation } from "wouter";
-import { MessageSquare, History, FileText, PanelLeftClose, PanelLeft } from "lucide-react";
+import { MessageSquare, History, FileText, PanelLeftClose, PanelLeft, HelpCircle, CreditCard } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Panel, PanelGroup } from "react-resizable-panels";
@@ -34,8 +34,13 @@ export function Sidebar() {
     },
     {
       href: "/pricing",
-      icon: FileText,
+      icon: CreditCard,
       label: "Pricing"
+    },
+    {
+      href: "/help",
+      icon: HelpCircle,
+      label: "Help & Support"
     },
   ];
 
