@@ -147,35 +147,83 @@ export class OpenAIService {
     }
   }
 
-  async analyzeLegalContext(query: string, relevantSections?: string[]): Promise<{
-    context: string;
-    confidence: number;
+  async analyzeLegalContext(query: string, files?: Array<{ type: string, content: string }>): Promise<{
+    answer: string;
+    confidence: {
+      score: number;
+      reasoning: string;
+    };
+    sources?: Array<{
+      title: string;
+      link: string;
+      section?: string;
+      type: 'finlex' | 'kkv' | 'other';
+      relevance: number;
+    }>;
+    fileAnalysis?: Array<{
+      analysis: string;
+    }>;
   }> {
     try {
-      const contextPrompt = `Analyze the following legal query in the context of Finnish law:
-Query: ${query}
-${relevantSections ? `Relevant sections:\n${relevantSections.join('\n')}` : ''}
+      // First analyze any attached files
+      let fileAnalyses: Array<{ analysis: string }> = [];
+      if (files && files.length > 0) {
+        fileAnalyses = await Promise.all(
+          files.map(async file => {
+            let analysis = '';
+            if (file.type.startsWith('image/')) {
+              analysis = await this.analyzeImage(file.content);
+            } else {
+              analysis = await this.analyzeLegalDocument(file.content);
+            }
+            return { analysis };
+          })
+        );
+      }
 
-Provide a JSON response with:
-{
-  "context": "Brief analysis of the legal context and applicable Finnish laws",
-  "confidence": "Number between 0 and 1 indicating confidence in the analysis"
-}`;
-
+      // Then generate the main legal response
       const response = await openai.chat.completions.create({
         model: "gpt-4o",
         messages: [
-          { role: "system", content: SYSTEM_PROMPT },
-          { role: "user", content: contextPrompt }
+          { 
+            role: "system", 
+            content: `${BASE_SYSTEM_PROMPT}\n\nAnalyze the following query and any attached documents in the context of Finnish law.`
+          },
+          { 
+            role: "user", 
+            content: `Query: ${query}\n${
+              fileAnalyses.length > 0 
+                ? `\nDocument Analyses:\n${fileAnalyses.map((f, i) => `Document ${i + 1}: ${f.analysis}`).join('\n')}`
+                : ''
+            }`
+          }
         ],
-        temperature: 0.3,
+        temperature: 0.7,
         response_format: { type: "json_object" }
       });
 
       const result = JSON.parse(response.choices[0].message.content!);
+      
       return {
-        context: result.context,
-        confidence: Math.max(0, Math.min(1, result.confidence))
+        answer: result.answer,
+        confidence: {
+          score: Math.max(0, Math.min(1, result.confidence.score)),
+          reasoning: result.confidence.reasoning
+        },
+        sources: result.sources?.map((source: { 
+          title: string;
+          link: string;
+          section?: string;
+          type: string;
+          relevance: number;
+        }) => ({
+          title: source.title,
+          link: source.link,
+          section: source.section,
+          type: source.type as 'finlex' | 'kkv' | 'other',
+          relevance: Math.max(0, Math.min(1, source.relevance))
+        })),
+        fileAnalysis: fileAnalyses
       };
     } catch (error) {
       console.error('Error analyzing legal context:', error);
@@ -190,14 +238,22 @@ Provide a JSON response with:
         messages: [
           {
             role: "system",
-            content: "You are a Finnish legal assistant analyzing images in a legal context. Focus on identifying legally relevant details and potential legal implications."
+            content: `You are a Finnish legal assistant analyzing images. 
+            Output your analysis in Finnish.
+            Focus on:
+            1. Any text visible in the image
+            2. Type of document or content shown
+            3. Legally relevant details
+            4. Potential legal implications
+            
+            Format your response in clear, structured Finnish.`
           },
           {
             role: "user",
             content: [
               {
                 type: "text",
-                text: "Analyze this image in the context of Finnish law. Identify any legal documents, relevant details, or potential legal implications."
+                text: "Analyze this image in detail, describing its contents and any potential legal relevance:"
               },
               {
                 type: "image_url",
@@ -205,16 +261,22 @@ Provide a JSON response with:
                   url: `data:image/jpeg;base64,${base64Image}`
                 }
               }
-            ],
-          },
+            ]
+          }
         ],
-        max_tokens: 500
+        temperature: 0.7,
+        max_tokens: 1000
       });
 
-      return response.choices[0].message.content || '';
+      const analysis = response.choices[0].message.content;
+      if (!analysis) {
+        throw new Error("Empty response from OpenAI");
+      }
+
+      return analysis;
     } catch (error) {
       console.error('Error analyzing image:', error);
-      return 'Failed to analyze image content';
+      return 'Kuvan analysoinnissa tapahtui virhe. Ole hyvä ja yritä uudelleen.';
     }
   }
 

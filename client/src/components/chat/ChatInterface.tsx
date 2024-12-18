@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { LanguageSelector } from "./LanguageSelector";
+import { addDocument } from "@/lib/preview-events";
 type LanguageMode = 'professional' | 'regular' | 'simple' | 'crazy';
 import { useMutation, useQueryClient, useQuery } from "@tanstack/react-query";
 import { MessageBubble } from "./MessageBubble";
@@ -229,17 +230,45 @@ export function ChatInterface({ initialSessionId }: ChatInterfaceProps) {
     }
   }, [sessionData]);
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     const trimmedInput = input.trim();
     if (!trimmedInput && attachments.length === 0) return;
     
     const formData = new FormData();
     formData.append('question', trimmedInput);
-    attachments.forEach(att => {
-      formData.append('attachments', att.file);
+    
+    // Add language mode to form data
+    formData.append('languageMode', languageMode);
+    
+    // Process attachments - convert to base64 for AI analysis
+    const processedAttachments = await Promise.all(
+      attachments.map(async (att) => {
+        return new Promise<{ file: File, content: string }>((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => {
+            const base64Content = reader.result as string;
+            const base64Data = base64Content.split(',')[1]; // Remove data URL prefix
+            resolve({ file: att.file, content: base64Data });
+          };
+          reader.onerror = () => reject(new Error('Failed to read file'));
+          if (att.file.type.startsWith('image/')) {
+            reader.readAsDataURL(att.file);
+          } else {
+            reader.readAsText(att.file);
+          }
+        });
+      })
+    );
+    
+    // Append files and their content for AI analysis
+    processedAttachments.forEach((att, index) => {
+      formData.append(`attachments[${index}]`, att.file);
+      formData.append(`attachmentContents[${index}]`, att.content);
+      formData.append(`attachmentTypes[${index}]`, att.file.type);
     });
     
     sendMessage.mutate(formData);
+    setAttachments([]); // Clear attachments after sending
   };
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -257,12 +286,25 @@ export function ChatInterface({ initialSessionId }: ChatInterfaceProps) {
         return;
       }
 
+      // Create preview URLs and add to attachments
       const newAttachments = newFiles.map(file => ({
         file,
         preview: URL.createObjectURL(file)
       }));
 
       setAttachments(prev => [...prev, ...newAttachments]);
+      
+      // Add to document sidebar
+      newFiles.forEach(file => {
+        addDocument({
+          id: Math.random().toString(36).substr(2, 9),
+          title: file.name,
+          content: `File type: ${file.type}, Size: ${(file.size / 1024).toFixed(2)} KB`,
+          type: file.type.startsWith('image/') ? 'image' : 'document',
+          timestamp: new Date().toISOString()
+        });
+      });
+
       if (fileInputRef.current) {
         fileInputRef.current.value = '';
       }

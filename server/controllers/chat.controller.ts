@@ -180,9 +180,12 @@ export class ChatController {
   async addMessage(req: Request, res: Response) {
     try {
       const question = req.body.question || '';
-      const languageMode = req.body.languageMode || 'regular';
+      const languageMode = req.body.languageMode || 'yleiskieli';
       const files = (req.files || []) as Express.Multer.File[];
+      const fileContents = req.body.attachmentContents || [];
+      const fileTypes = req.body.attachmentTypes || [];
       
+      // Process attachments for storage
       const attachments = files.map(file => ({
         type: file.mimetype.startsWith('image/') ? 'image' : 'document',
         filename: file.originalname,
@@ -190,6 +193,7 @@ export class ChatController {
         contentType: file.mimetype,
         size: file.size
       }));
+
       const sessionId = parseInt(req.params.id);
 
       // Verify session exists
@@ -220,23 +224,38 @@ export class ChatController {
       }
 
       const startTime = Date.now();
-      const legalResponse = await this.openAIService.generateLegalResponse(
+
+      // Prepare files for AI analysis
+      const filesToAnalyze = files.map((file, index) => ({
+        type: fileTypes[index],
+        content: fileContents[index]
+      }));
+
+      // Get legal response with file analysis
+      const legalResponse = await this.legalService.analyzeLegalContext(
         question,
-        languageMode as 'professional' | 'regular' | 'simple' | 'crazy'
+        filesToAnalyze.length > 0 ? filesToAnalyze : undefined
       );
+
+      // Generate file-specific responses
+      let answer = legalResponse.answer;
+      if (filesToAnalyze.length > 0 && legalResponse.fileAnalysis) {
+        answer += '\n\nTiedostoanalyysi:\n';
+        legalResponse.fileAnalysis.forEach((analysis, index) => {
+          const file = files[index];
+          answer += `\n${file.originalname}:\n${analysis.analysis}\n`;
+        });
+      }
 
       // Store in database
       const insertData = {
         sessionId,
         question,
-        answer: legalResponse.answer,
+        answer,
         sources: legalResponse.sources,
-        confidence: legalResponse.confidence
+        confidence: legalResponse.confidence,
+        attachments
       };
-
-      if (attachments.length > 0) {
-        Object.assign(insertData, { attachments });
-      }
 
       const [query] = await db.insert(queries)
         .values(insertData)
@@ -245,7 +264,7 @@ export class ChatController {
       // Return enhanced response
       res.json({
         id: query.id,
-        answer: legalResponse.answer,
+        answer,
         sources: legalResponse.sources,
         attachments,
         metadata: {
