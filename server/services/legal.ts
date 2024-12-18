@@ -65,7 +65,7 @@ export class LegalService {
     }
   }
 
-  async analyzeLegalContext(query: string, files?: Array<{ type: string, content: string }>) {
+  async analyzeLegalContext(query: string, files?: Array<{ type: string, content: string, name: string }>) {
     try {
       // Fetch relevant documents and guidelines
       const [finlexDocs, kkvGuidelines] = await Promise.all([
@@ -82,14 +82,14 @@ export class LegalService {
       let fileContext = '';
       if (files && files.length > 0) {
         fileContext = '\n\nUploaded files context:\n' + files.map(file => 
-          `Type: ${file.type}\nContent: ${file.content}`
+          `File: ${file.name}\nType: ${file.type}\nContent: ${file.content}`
         ).join('\n\n');
       }
 
       // Get AI-generated response with file context included
-      const [legalResponse, contextAnalysis] = await Promise.all([
+      const [legalResponse, analysisResult] = await Promise.all([
         this.openAIService.generateLegalResponse(query + fileContext),
-        this.openAIService.analyzeLegalContext(query + fileContext, relevantSections)
+        this.openAIService.analyzeLegalContext(query, files)
       ]);
 
       // Merge AI response with document sources

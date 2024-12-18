@@ -147,7 +147,7 @@ export class OpenAIService {
     }
   }
 
-  async analyzeLegalContext(query: string, files?: Array<{ type: string, content: string }>): Promise<{
+  async analyzeLegalContext(query: string, files?: Array<{ type: string, content: string, name: string }>): Promise<{
     answer: string;
     confidence: {
       score: number;
@@ -162,21 +162,30 @@ export class OpenAIService {
     }>;
     fileAnalysis?: Array<{
       analysis: string;
+      type: string;
+      name: string;
     }>;
   }> {
     try {
       // First analyze any attached files
-      let fileAnalyses: Array<{ analysis: string }> = [];
+      let fileAnalyses: Array<{ analysis: string; type: string; name: string }> = [];
       if (files && files.length > 0) {
         fileAnalyses = await Promise.all(
           files.map(async file => {
             let analysis = '';
-            if (file.type.startsWith('image/')) {
+            const mimeType = file.type || 'application/octet-stream';
+            
+            if (mimeType.startsWith('image/')) {
               analysis = await this.analyzeImage(file.content);
             } else {
               analysis = await this.analyzeLegalDocument(file.content);
             }
-            return { analysis };
+            
+            return { 
+              analysis,
+              type: mimeType,
+              name: file.name
+            };
           })
         );
       }

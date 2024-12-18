@@ -229,14 +229,15 @@ export class ChatController {
 
       // Prepare files for AI analysis
       const filesToAnalyze = files.map((file, index) => ({
-        type: fileTypes[index],
-        content: fileContents[index]
+        type: file.mimetype,
+        content: fileContents[index],
+        name: file.originalname
       }));
 
       // Get legal response with file analysis
       const legalResponse = await this.legalService.analyzeLegalContext(
         question,
-        filesToAnalyze.length > 0 ? filesToAnalyze : undefined
+        filesToAnalyze
       );
 
       // Generate file-specific responses
