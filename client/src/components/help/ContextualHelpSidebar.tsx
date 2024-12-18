@@ -52,6 +52,7 @@ export function ContextualHelpSidebar() {
   const [messages, setMessages] = useState<HelpMessage[]>([]);
   const [inputValue, setInputValue] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [languageMode, setLanguageMode] = useState<'professional' | 'regular' | 'simple' | 'crazy'>('regular');
   const { toast } = useToast();
 
   const currentContext = PAGE_CONTEXTS[location] || PAGE_CONTEXTS['/'];
@@ -115,6 +116,7 @@ export function ContextualHelpSidebar() {
             path: currentContext.path,
             title: currentContext.title,
             description: currentContext.description,
+            languageMode: languageMode
           },
           history: messages
         })
@@ -160,14 +162,39 @@ export function ContextualHelpSidebar() {
             className="fixed inset-y-0 right-0 w-96 bg-background border-l shadow-lg z-50"
           >
             <div className="h-full flex flex-col">
-              <div className="p-4 border-b flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <currentContext.icon className="h-5 w-5 text-primary" />
-                  <h2 className="font-semibold">Help & Guidance</h2>
+              <div className="p-4 border-b">
+                <div className="flex items-center justify-between mb-4">
+                  <div className="flex items-center gap-2">
+                    <currentContext.icon className="h-5 w-5 text-primary" />
+                    <h2 className="font-semibold">Legal Assistant</h2>
+                  </div>
+                  <Button variant="ghost" size="icon" onClick={() => setIsOpen(false)}>
+                    <X className="h-5 w-5" />
+                  </Button>
                 </div>
-                <Button variant="ghost" size="icon" onClick={() => setIsOpen(false)}>
-                  <X className="h-5 w-5" />
-                </Button>
+                <div className="flex gap-2">
+                  <Button
+                    variant={languageMode === 'professional' ? 'default' : 'outline'}
+                    size="sm"
+                    onClick={() => setLanguageMode('professional')}
+                  >
+                    Professional
+                  </Button>
+                  <Button
+                    variant={languageMode === 'regular' ? 'default' : 'outline'}
+                    size="sm"
+                    onClick={() => setLanguageMode('regular')}
+                  >
+                    Regular
+                  </Button>
+                  <Button
+                    variant={languageMode === 'simple' ? 'default' : 'outline'}
+                    size="sm"
+                    onClick={() => setLanguageMode('simple')}
+                  >
+                    Simple
+                  </Button>
+                </div>
               </div>
 
               <ScrollArea className="flex-1 p-4">
