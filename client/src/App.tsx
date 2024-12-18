@@ -19,7 +19,7 @@ function ResizeHandle() {
 
 function App() {
   return (
-    <div className="h-screen flex flex-col">
+    <div className="min-h-screen flex flex-col bg-background text-foreground">
       <Header />
       <div className="flex-1 overflow-hidden">
         <PanelGroup direction="horizontal" className="h-full">
@@ -29,7 +29,7 @@ function App() {
             maxSize={30} 
             collapsible
           >
-            <div className="h-full">
+            <div className="h-full border-r border-border">
               <Sidebar />
             </div>
           </Panel>
@@ -39,7 +39,7 @@ function App() {
             minSize={70} 
             className="transition-all duration-300"
           >
-            <main className="h-full overflow-y-auto bg-[#f5f3f0]">
+            <main className="h-full overflow-y-auto">
               <Switch>
                 <Route path="/" component={Home} />
                 <Route path="/history" component={History} />
