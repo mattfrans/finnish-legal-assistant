@@ -261,10 +261,10 @@ export function ChatInterface({ initialSessionId }: ChatInterfaceProps) {
     );
     
     // Append files and their content for AI analysis
-    processedAttachments.forEach((att, index) => {
-      formData.append(`attachments[${index}]`, att.file);
-      formData.append(`attachmentContents[${index}]`, att.content);
-      formData.append(`attachmentTypes[${index}]`, att.file.type);
+    processedAttachments.forEach((att) => {
+      formData.append('attachments', att.file);
+      formData.append('attachmentContents', att.content);
+      formData.append('attachmentTypes', att.file.type);
     });
     
     sendMessage.mutate(formData);
