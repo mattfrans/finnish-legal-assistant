@@ -1,5 +1,6 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
+import multer from "multer";
 import { LegalController } from "./controllers/legal.controller";
 import { DocumentsController } from "./controllers/documents.controller";
 import { ChatController } from "./controllers/chat.controller";
@@ -64,8 +65,26 @@ export function registerRoutes(app: Express): Server {
   app.delete(`${apiV1}/sessions/:id`, (req, res) => chatController.deleteSession(req, res));
   app.put(`${apiV1}/sessions/:id/pin`, (req, res) => chatController.togglePin(req, res));
   app.post(`${apiV1}/sessions/:id/chat`, 
-    (req, res, next) => chatController.upload.array('attachments')(req, res, next),
-    (req, res) => chatController.addMessage(req, res)
+    (req, res, next) => {
+      chatController.upload(req, res, (err) => {
+        if (err instanceof multer.MulterError) {
+          // A Multer error occurred during upload
+          return res.status(400).json({
+            error: err.message,
+            code: 'UPLOAD_ERROR',
+            field: err.field
+          });
+        } else if (err) {
+          // An unknown error occurred
+          return res.status(500).json({
+            error: 'File upload failed',
+            code: 'UPLOAD_ERROR'
+          });
+        }
+        // If successful, proceed to message handler
+        chatController.addMessage(req, res);
+      });
+    }
   );
   app.post(`${apiV1}/sessions/:id/queries/:queryId/feedback`, (req, res) => chatController.addFeedback(req, res));
   app.get(`${apiV1}/sessions/:id/analysis`, (req, res) => chatController.getAnalysis(req, res));

@@ -11,7 +11,7 @@ import fs from 'fs/promises';
 
 export class ChatController {
   // Set up file upload storage
-  private upload = multer({
+  public upload = multer({
     storage: multer.diskStorage({
       destination: async (req, file, cb) => {
         const uploadDir = path.join(process.cwd(), 'uploads');
@@ -44,7 +44,9 @@ export class ChatController {
     limits: {
       fileSize: 5 * 1024 * 1024 // 5MB limit
     }
-  });
+  }).fields([
+    { name: 'attachments', maxCount: 10 }
+  ]); // Configure multer to handle multiple files with field name 'attachments'
   private legalService: LegalService;
   private openAIService: OpenAIService;
 
@@ -181,7 +183,7 @@ export class ChatController {
     try {
       const question = req.body.question || '';
       const languageMode = req.body.languageMode || 'yleiskieli';
-      const files = (req.files || []) as Express.Multer.File[];
+      const files = ((req.files as { [fieldname: string]: Express.Multer.File[] })?.['attachments'] || []);
       const fileContents = req.body.attachmentContents || [];
       const fileTypes = req.body.attachmentTypes || [];
       
