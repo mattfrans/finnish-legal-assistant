@@ -183,6 +183,67 @@ Provide a JSON response with:
     }
   }
 
+  async analyzeImage(base64Image: string): Promise<string> {
+    try {
+      const response = await openai.chat.completions.create({
+        model: "gpt-4o",
+        messages: [
+          {
+            role: "system",
+            content: "You are a Finnish legal assistant analyzing images in a legal context. Focus on identifying legally relevant details and potential legal implications."
+          },
+          {
+            role: "user",
+            content: [
+              {
+                type: "text",
+                text: "Analyze this image in the context of Finnish law. Identify any legal documents, relevant details, or potential legal implications."
+              },
+              {
+                type: "image_url",
+                image_url: {
+                  url: `data:image/jpeg;base64,${base64Image}`
+                }
+              }
+            ],
+          },
+        ],
+        max_tokens: 500
+      });
+
+      return response.choices[0].message.content || '';
+    } catch (error) {
+      console.error('Error analyzing image:', error);
+      return 'Failed to analyze image content';
+    }
+  }
+
+  async analyzeLegalDocument(content: string): Promise<string> {
+    try {
+      const response = await openai.chat.completions.create({
+        model: "gpt-4o",
+        messages: [
+          {
+            role: "system",
+            content: "You are a Finnish legal assistant analyzing legal documents. Focus on identifying key legal points, implications, and relevant Finnish laws."
+          },
+          {
+            role: "user",
+            content: `Analyze the following document content in the context of Finnish law:\n\n${content}`
+          }
+        ],
+        max_tokens: 1000,
+        response_format: { type: "json_object" }
+      });
+
+      const result = JSON.parse(response.choices[0].message.content!);
+      return result.analysis || 'No analysis available';
+    } catch (error) {
+      console.error('Error analyzing document:', error);
+      return 'Failed to analyze document content';
+    }
+  }
+
   async generateChatSuggestions(context: { messages: Array<{ role: "user" | "assistant"; content: string }> }): Promise<string[]> {
     try {
       const response = await openai.chat.completions.create({

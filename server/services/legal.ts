@@ -65,7 +65,7 @@ export class LegalService {
     }
   }
 
-  async analyzeLegalContext(query: string) {
+  async analyzeLegalContext(query: string, files?: Array<{ type: string, content: string }>) {
     try {
       // Fetch relevant documents and guidelines
       const [finlexDocs, kkvGuidelines] = await Promise.all([
@@ -78,10 +78,18 @@ export class LegalService {
         .flatMap(doc => doc.sections)
         .map(section => `${section.identifier}: ${section.content}`);
 
-      // Get AI-generated response
+      // Add file context if provided
+      let fileContext = '';
+      if (files && files.length > 0) {
+        fileContext = '\n\nUploaded files context:\n' + files.map(file => 
+          `Type: ${file.type}\nContent: ${file.content}`
+        ).join('\n\n');
+      }
+
+      // Get AI-generated response with file context included
       const [legalResponse, contextAnalysis] = await Promise.all([
-        this.openAIService.generateLegalResponse(query),
-        this.openAIService.analyzeLegalContext(query, relevantSections)
+        this.openAIService.generateLegalResponse(query + fileContext),
+        this.openAIService.analyzeLegalContext(query + fileContext, relevantSections)
       ]);
 
       // Merge AI response with document sources
@@ -107,11 +115,36 @@ export class LegalService {
         answer: legalResponse.answer,
         sources: sources,
         legalContext: contextAnalysis.context,
-        confidence: legalResponse.confidence
+        confidence: legalResponse.confidence,
+        fileAnalysis: files ? await this.analyzeUploadedFiles(files) : undefined
       };
     } catch (error) {
       console.error('Error in analyzeLegalContext:', error);
       throw new Error('Failed to analyze legal context');
+    }
+  }
+
+  private async analyzeUploadedFiles(files: Array<{ type: string, content: string }>) {
+    try {
+      const analyses = await Promise.all(files.map(async file => {
+        let analysis = '';
+        if (file.type.startsWith('image/')) {
+          // Image analysis
+          analysis = await this.openAIService.analyzeImage(file.content);
+        } else {
+          // Document content analysis
+          analysis = await this.openAIService.analyzeLegalDocument(file.content);
+        }
+        return {
+          type: file.type,
+          analysis
+        };
+      }));
+      
+      return analyses;
+    } catch (error) {
+      console.error('Error analyzing files:', error);
+      return [];
     }
   }
 }
