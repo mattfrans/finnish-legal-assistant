@@ -104,7 +104,7 @@ Format your response as a JSON object with the following structure:
 }`;
 
 export class OpenAIService {
-  async generateLegalResponse(query: string, languageMode: 'professional' | 'regular' | 'simple' | 'crazy' = 'regular'): Promise<LegalResponse> {
+  async generateLegalResponse(query: string, languageMode: keyof typeof LANGUAGE_MODES = 'yleiskieli'): Promise<LegalResponse> {
     try {
       const modePrompt = LANGUAGE_MODES[languageMode];
       const systemPrompt = `${modePrompt}\n\n${BASE_SYSTEM_PROMPT}`;
@@ -225,7 +225,14 @@ Provide a JSON response with:
         messages: [
           {
             role: "system",
-            content: "You are a Finnish legal assistant analyzing legal documents. Focus on identifying key legal points, implications, and relevant Finnish laws."
+            content: `You are a Finnish legal assistant analyzing legal documents. Output your analysis in Finnish.
+            Focus on:
+            1. Key legal points and implications
+            2. Relevant Finnish laws and regulations
+            3. Potential risks or compliance issues
+            4. Recommendations based on Finnish legal framework
+            
+            Respond in a structured format with clear sections.`
           },
           {
             role: "user",
@@ -233,14 +240,15 @@ Provide a JSON response with:
           }
         ],
         max_tokens: 1000,
+        temperature: 0.7,
         response_format: { type: "json_object" }
       });
 
       const result = JSON.parse(response.choices[0].message.content!);
-      return result.analysis || 'No analysis available';
+      return result.analysis || 'Asiakirjan analyysiä ei voitu suorittaa';
     } catch (error) {
       console.error('Error analyzing document:', error);
-      return 'Failed to analyze document content';
+      return 'Asiakirjan analysoinnissa tapahtui virhe';
     }
   }
 

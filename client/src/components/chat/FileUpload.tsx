@@ -5,11 +5,12 @@ import { addDocument } from "@/lib/preview-events";
 import { useToast } from "@/hooks/use-toast";
 
 interface FileUploadProps {
-  onFileUpload: (files: File[]) => void;
+  onFileUpload: (files: Array<{ file: File, content: string }>) => Promise<void>;
 }
 
 export function FileUpload({ onFileUpload }: FileUploadProps) {
   const [isDragging, setIsDragging] = useState(false);
+  const [isProcessing, setIsProcessing] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
 
@@ -20,6 +21,30 @@ export function FileUpload({ onFileUpload }: FileUploadProps) {
 
   const handleDragLeave = () => {
     setIsDragging(false);
+  };
+
+  const processFile = (file: File): Promise<{ file: File, content: string }> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      
+      reader.onload = () => {
+        const base64Content = reader.result as string;
+        const base64Data = base64Content.split(',')[1]; // Remove data URL prefix
+        
+        resolve({ 
+          file,
+          content: base64Data
+        });
+      };
+      
+      reader.onerror = () => reject(new Error('Failed to read file'));
+      
+      if (file.type.startsWith('image/')) {
+        reader.readAsDataURL(file);
+      } else {
+        reader.readAsText(file);
+      }
+    });
   };
 
   const handleFiles = async (files: FileList) => {
@@ -47,11 +72,12 @@ export function FileUpload({ onFileUpload }: FileUploadProps) {
 
     if (validFiles.length === 0) return;
 
-    // Add files to document preview sidebar
-    validFiles.forEach(file => {
-      const reader = new FileReader();
-      reader.onload = () => {
-        // Add to document preview
+    setIsProcessing(true);
+    try {
+      const processedFiles = await Promise.all(validFiles.map(processFile));
+      
+      // Add files to document preview sidebar
+      processedFiles.forEach(({ file }) => {
         addDocument({
           id: Math.random().toString(36).substr(2, 9),
           title: file.name,
@@ -59,11 +85,20 @@ export function FileUpload({ onFileUpload }: FileUploadProps) {
           type: file.type.startsWith('image/') ? 'image' : 'document',
           timestamp: new Date().toISOString()
         });
-      };
-      reader.readAsDataURL(file);
-    });
+      });
 
-    onFileUpload(validFiles);
+      // Send to parent for AI analysis
+      await onFileUpload(processedFiles);
+    } catch (error) {
+      console.error('Error processing files:', error);
+      toast({
+        variant: "destructive",
+        title: "Virhe tiedostojen käsittelyssä",
+        description: "Tiedostojen käsittelyssä tapahtui virhe. Yritä uudelleen."
+      });
+    } finally {
+      setIsProcessing(false);
+    }
   };
 
   const handleDrop = (e: React.DragEvent) => {
@@ -100,11 +135,19 @@ export function FileUpload({ onFileUpload }: FileUploadProps) {
           multiple
           onChange={handleFileInput}
           accept="image/*,.pdf,.doc,.docx,.txt"
+          disabled={isProcessing}
         />
         <div className="flex flex-col items-center gap-2">
-          <Upload className="h-8 w-8 text-muted-foreground" />
+          {isProcessing ? (
+            <div className="animate-spin rounded-full h-8 w-8 border-2 border-primary border-t-transparent" />
+          ) : (
+            <Upload className="h-8 w-8 text-muted-foreground" />
+          )}
           <p className="text-sm text-muted-foreground">
-            Raahaa ja pudota tiedostoja tähän tai klikkaa valitaksesi
+            {isProcessing 
+              ? "Käsitellään tiedostoja..."
+              : "Raahaa ja pudota tiedostoja tähän tai klikkaa valitaksesi"
+            }
           </p>
           <p className="text-xs text-muted-foreground">
             Tuetut tiedostotyypit: JPG, PNG, GIF, PDF, DOC, DOCX, TXT
