@@ -52,7 +52,7 @@ export function ContextualHelpSidebar() {
   const [messages, setMessages] = useState<HelpMessage[]>([]);
   const [inputValue, setInputValue] = useState("");
   const [isLoading, setIsLoading] = useState(false);
-  const [languageMode, setLanguageMode] = useState<'professional' | 'regular' | 'simple' | 'crazy'>('regular');
+  const [languageMode, setLanguageMode] = useState<'lakimieskieli' | 'yleiskieli' | 'selkokieli'>('yleiskieli');
   const { toast } = useToast();
 
   const currentContext = PAGE_CONTEXTS[location] || PAGE_CONTEXTS['/'];
@@ -174,25 +174,25 @@ export function ContextualHelpSidebar() {
                 </div>
                 <div className="flex gap-2">
                   <Button
-                    variant={languageMode === 'professional' ? 'default' : 'outline'}
+                    variant={languageMode === 'lakimieskieli' ? 'default' : 'outline'}
                     size="sm"
-                    onClick={() => setLanguageMode('professional')}
+                    onClick={() => setLanguageMode('lakimieskieli')}
                   >
-                    Professional
+                    Lakimieskieli
                   </Button>
                   <Button
-                    variant={languageMode === 'regular' ? 'default' : 'outline'}
+                    variant={languageMode === 'yleiskieli' ? 'default' : 'outline'}
                     size="sm"
-                    onClick={() => setLanguageMode('regular')}
+                    onClick={() => setLanguageMode('yleiskieli')}
                   >
-                    Regular
+                    Yleiskieli
                   </Button>
                   <Button
-                    variant={languageMode === 'simple' ? 'default' : 'outline'}
+                    variant={languageMode === 'selkokieli' ? 'default' : 'outline'}
                     size="sm"
-                    onClick={() => setLanguageMode('simple')}
+                    onClick={() => setLanguageMode('selkokieli')}
                   >
-                    Simple
+                    Selkokieli
                   </Button>
                 </div>
               </div>
