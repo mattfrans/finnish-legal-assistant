@@ -1,7 +1,7 @@
 import { drizzle } from "drizzle-orm/neon-serverless";
 import { sql } from "drizzle-orm";
 import ws from "ws";
-import * as schema from "@db/schema";
+import * as schema from "./schema";
 
 if (!process.env.DATABASE_URL) {
   throw new Error(
