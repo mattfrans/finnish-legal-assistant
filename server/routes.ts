@@ -10,6 +10,8 @@ import { LegalService } from "./services/legal";
 
 // Middleware to ensure user is authenticated
 const requireAuth = (req: any, res: any, next: any) => {
+  console.log('Auth check - isAuthenticated:', req.isAuthenticated());
+  console.log('Auth check - session:', req.session);
   if (req.isAuthenticated()) {
     return next();
   }
@@ -30,6 +32,8 @@ const requireActiveSubscription = (req: any, res: any, next: any) => {
 };
 
 export function registerRoutes(app: Express): Server {
+  console.log('Registering routes...');
+
   // Initialize controllers
   const legalController = new LegalController();
   const documentsController = new DocumentsController();
@@ -38,63 +42,29 @@ export function registerRoutes(app: Express): Server {
 
   // Set up authentication
   setupAuth(app);
+  console.log('Auth setup completed');
 
   // API Version prefix
   const apiV1 = '/api/v1';
 
   // Public routes (no auth required)
-  app.post('/api/register', (req, res, next) => {
-    // Handled by auth.ts
-  });
-  app.post('/api/login', (req, res, next) => {
-    // Handled by auth.ts
-  });
-  app.get('/api/user', (req, res) => {
-    // Handled by auth.ts
+  app.get('/api/health', (req, res) => {
+    res.json({ status: 'healthy', timestamp: new Date().toISOString() });
   });
 
   // Protected routes
-  // Contextual Help routes
-  app.post(`${apiV1}/contextual-help`, requireAuth, async (req, res) => {
-    try {
-      const { message, context, history } = req.body;
-      const legalService = new LegalService();
-
-      const response = await legalService.analyzeLegalContext(
-        message || `Generate helpful information about ${context.title}: ${context.description}`
-      );
-
-      res.json({
-        content: response.answer,
-        sources: response.sources
-      });
-    } catch (error: unknown) {
-      console.error('Error in contextual help:', error);
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      res.status(500).json({
-        error: 'Failed to generate contextual help',
-        details: process.env.NODE_ENV === 'development' ? errorMessage : undefined
-      });
-    }
+  // Chat routes
+  console.log('Registering chat routes...');
+  app.post(`${apiV1}/sessions`, requireAuth, (req, res) => {
+    console.log('Create session request received', { userId: req.user?.id });
+    chatController.createSession(req, res);
   });
 
-  // Legal routes (require active subscription)
-  app.get(`${apiV1}/legal/search`, requireAuth, requireActiveSubscription, (req, res) => legalController.search(req, res));
-  app.get(`${apiV1}/legal/statutes`, requireAuth, requireActiveSubscription, (req, res) => legalController.getStatutes(req, res));
-  app.get(`${apiV1}/legal/guidelines`, requireAuth, requireActiveSubscription, (req, res) => legalController.getGuidelines(req, res));
+  app.get(`${apiV1}/sessions`, requireAuth, (req, res) => {
+    console.log('Get sessions request received', { userId: req.user?.id });
+    chatController.getSessions(req, res);
+  });
 
-  // Document routes
-  app.get(`${apiV1}/documents/recent`, requireAuth, (req, res) => documentsController.getRecent(req, res));
-  app.get(`${apiV1}/documents/popular`, requireAuth, (req, res) => documentsController.getPopular(req, res));
-  app.get(`${apiV1}/documents/categories`, requireAuth, (req, res) => documentsController.getCategories(req, res));
-
-  // Template routes (require active subscription)
-  app.get(`${apiV1}/templates`, requireAuth, requireActiveSubscription, (req, res) => templatesController.getTemplates(req, res));
-  app.get(`${apiV1}/templates/:id`, requireAuth, requireActiveSubscription, (req, res) => templatesController.getTemplate(req, res));
-
-  // Chat routes
-  app.post(`${apiV1}/sessions`, requireAuth, (req, res) => chatController.createSession(req, res));
-  app.get(`${apiV1}/sessions`, requireAuth, (req, res) => chatController.getSessions(req, res));
   app.get(`${apiV1}/sessions/:id`, requireAuth, (req, res) => chatController.getSession(req, res));
   app.patch(`${apiV1}/sessions/:id`, requireAuth, (req, res) => chatController.updateSession(req, res));
   app.delete(`${apiV1}/sessions/:id`, requireAuth, (req, res) => chatController.deleteSession(req, res));
@@ -122,6 +92,21 @@ export function registerRoutes(app: Express): Server {
       });
     }
   );
+
+  // Legal routes (require active subscription)
+  console.log('Registering legal routes...');
+  app.get(`${apiV1}/legal/search`, requireAuth, requireActiveSubscription, (req, res) => legalController.search(req, res));
+  app.get(`${apiV1}/legal/statutes`, requireAuth, requireActiveSubscription, (req, res) => legalController.getStatutes(req, res));
+  app.get(`${apiV1}/legal/guidelines`, requireAuth, requireActiveSubscription, (req, res) => legalController.getGuidelines(req, res));
+
+  // Document routes
+  app.get(`${apiV1}/documents/recent`, requireAuth, (req, res) => documentsController.getRecent(req, res));
+  app.get(`${apiV1}/documents/popular`, requireAuth, (req, res) => documentsController.getPopular(req, res));
+  app.get(`${apiV1}/documents/categories`, requireAuth, (req, res) => documentsController.getCategories(req, res));
+
+  // Template routes (require active subscription)
+  app.get(`${apiV1}/templates`, requireAuth, requireActiveSubscription, (req, res) => templatesController.getTemplates(req, res));
+  app.get(`${apiV1}/templates/:id`, requireAuth, requireActiveSubscription, (req, res) => templatesController.getTemplate(req, res));
 
   // Feedback and analysis routes
   app.post(`${apiV1}/sessions/:id/queries/:queryId/feedback`, requireAuth, (req, res) => chatController.addFeedback(req, res));
