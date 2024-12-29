@@ -5,8 +5,8 @@ import session from "express-session";
 import createMemoryStore from "memorystore";
 import { scrypt, randomBytes, timingSafeEqual } from "crypto";
 import { promisify } from "util";
-import { users, insertUserSchema } from "../db/schema";
-import { db } from "../db";
+import { users, type User as DbUser, insertUserSchema } from "../db/schema";
+import { db } from "../db/index";
 import { eq } from "drizzle-orm";
 import { MFAService } from './services/mfa';
 
@@ -29,27 +29,20 @@ const crypto = {
   },
 };
 
+// Extend session type to include MFA properties
+declare module 'express-session' {
+  interface SessionData {
+    mfaPending?: boolean;
+    mfaUserId?: number;
+  }
+}
+
 // extend express user object with our schema
 declare global {
   namespace Express {
-    interface User {
-      id: number;
-      username: string;
-      email: string;
-      role: 'free' | 'premium' | 'admin';
-      subscriptionStatus: 'active' | 'cancelled' | 'expired' | 'trial';
-      firstName?: string;
-      lastName?: string;
-      companyName?: string;
-      position?: string;
-      phoneNumber?: string;
-      preferences: {
-        language?: 'fi' | 'en';
-        notifications?: boolean;
-        theme?: 'light' | 'dark' | 'system';
-      };
-      mfaEnabled?: boolean;
-      mfaMethod?: 'totp' | 'backup';
+    interface User extends Omit<DbUser, 'password'> {
+      mfaEnabled: boolean;
+      mfaMethod: 'none' | 'totp' | 'email' | 'sms';
     }
   }
 }
@@ -100,7 +93,9 @@ export function setupAuth(app: Express) {
           .set({ lastLoginAt: new Date() })
           .where(eq(users.id, user.id));
 
-        return done(null, user);
+        // Omit password from user object
+        const { password: _, ...userWithoutPassword } = user;
+        return done(null, userWithoutPassword as Express.User);
       } catch (err) {
         return done(err);
       }
@@ -118,7 +113,14 @@ export function setupAuth(app: Express) {
         .from(users)
         .where(eq(users.id, id))
         .limit(1);
-      done(null, user);
+
+      if (!user) {
+        return done(null, false);
+      }
+
+      // Omit password from user object
+      const { password: _, ...userWithoutPassword } = user;
+      done(null, userWithoutPassword as Express.User);
     } catch (err) {
       done(err);
     }
@@ -130,7 +132,7 @@ export function setupAuth(app: Express) {
       if (!result.success) {
         return res
           .status(400)
-          .send("Invalid input: " + result.error.issues.map(i => i.message).join(", "));
+          .send("Invalid input: " + result.error.issues.map((i: any) => i.message).join(", "));
       }
 
       const { username, password, email, firstName, lastName, companyName, position } = result.data;
@@ -144,17 +146,6 @@ export function setupAuth(app: Express) {
 
       if (existingUser) {
         return res.status(400).send("Username already exists");
-      }
-
-      // Check if email is already in use
-      const [existingEmail] = await db
-        .select()
-        .from(users)
-        .where(eq(users.email, email))
-        .limit(1);
-
-      if (existingEmail) {
-        return res.status(400).send("Email already registered");
       }
 
       // Hash the password
@@ -175,7 +166,9 @@ export function setupAuth(app: Express) {
           subscriptionStatus: 'trial',
           createdAt: new Date(),
           updatedAt: new Date(),
-          preferences: { language: 'fi', notifications: true, theme: 'system' }
+          preferences: { language: 'fi', notifications: true, theme: 'system' },
+          mfaEnabled: false,
+          mfaMethod: 'none'
         })
         .returning();
 
@@ -191,7 +184,9 @@ export function setupAuth(app: Express) {
             username: newUser.username,
             email: newUser.email,
             role: newUser.role,
-            subscriptionStatus: newUser.subscriptionStatus
+            subscriptionStatus: newUser.subscriptionStatus,
+            mfaEnabled: newUser.mfaEnabled,
+            mfaMethod: newUser.mfaMethod
           },
         });
       });
@@ -236,7 +231,9 @@ export function setupAuth(app: Express) {
             email: user.email,
             role: user.role,
             subscriptionStatus: user.subscriptionStatus,
-            preferences: user.preferences
+            preferences: user.preferences,
+            mfaEnabled: user.mfaEnabled,
+            mfaMethod: user.mfaMethod
           },
         });
       });
@@ -367,53 +364,12 @@ export function setupAuth(app: Express) {
         lastName: user.lastName,
         companyName: user.companyName,
         position: user.position,
-        preferences: user.preferences
+        preferences: user.preferences,
+        mfaEnabled: user.mfaEnabled,
+        mfaMethod: user.mfaMethod
       });
     }
 
     res.status(401).send("Not logged in");
-  });
-
-  // Profile update endpoint
-  app.put("/api/user/profile", async (req, res) => {
-    if (!req.isAuthenticated()) {
-      return res.status(401).send("Not logged in");
-    }
-
-    try {
-      const { firstName, lastName, companyName, position, phoneNumber, preferences } = req.body;
-
-      const [updatedUser] = await db
-        .update(users)
-        .set({
-          firstName,
-          lastName,
-          companyName,
-          position,
-          phoneNumber,
-          preferences,
-          updatedAt: new Date()
-        })
-        .where(eq(users.id, req.user.id))
-        .returning();
-
-      res.json({
-        message: "Profile updated successfully",
-        user: {
-          id: updatedUser.id,
-          username: updatedUser.username,
-          email: updatedUser.email,
-          role: updatedUser.role,
-          subscriptionStatus: updatedUser.subscriptionStatus,
-          firstName: updatedUser.firstName,
-          lastName: updatedUser.lastName,
-          companyName: updatedUser.companyName,
-          position: updatedUser.position,
-          preferences: updatedUser.preferences
-        }
-      });
-    } catch (error) {
-      res.status(500).send("Failed to update profile");
-    }
   });
 }

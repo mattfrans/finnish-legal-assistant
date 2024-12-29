@@ -1,6 +1,6 @@
 import speakeasy from 'speakeasy';
 import QRCode from 'qrcode';
-import { db } from '../../db';
+import { db } from '../../db/index';
 import { users } from '../../db/schema';
 import { eq } from 'drizzle-orm';
 import crypto from 'crypto';
@@ -13,6 +13,9 @@ export class MFAService {
       length: 20
     });
 
+    // Ensure otpauth_url exists before generating QR code
+    const otpauthUrl = `otpauth://totp/Finnish%20Legal%20Platform:${secret.base32}?secret=${secret.base32}&issuer=Finnish%20Legal%20Platform`;
+
     // Store the secret in the database
     await db.update(users)
       .set({
@@ -23,7 +26,6 @@ export class MFAService {
       .where(eq(users.id, userId));
 
     // Generate QR code for easy setup
-    const otpauthUrl = secret.otpauth_url;
     const qrCodeDataUrl = await QRCode.toDataURL(otpauthUrl);
 
     // Generate backup codes
@@ -74,7 +76,7 @@ export class MFAService {
 
     const backupCodes = user.backupCodes as string[];
     const codeIndex = backupCodes.indexOf(code);
-    
+
     if (codeIndex === -1) {
       return false;
     }
