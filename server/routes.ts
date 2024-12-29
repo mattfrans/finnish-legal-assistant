@@ -10,8 +10,12 @@ import { LegalService } from "./services/legal";
 
 // Middleware to ensure user is authenticated
 const requireAuth = (req: any, res: any, next: any) => {
-  console.log('Auth check - isAuthenticated:', req.isAuthenticated());
-  console.log('Auth check - session:', req.session);
+  console.log('Auth check - Session:', {
+    id: req.sessionID,
+    user: req.user?.id,
+    isAuthenticated: req.isAuthenticated()
+  });
+
   if (req.isAuthenticated()) {
     return next();
   }
@@ -20,6 +24,11 @@ const requireAuth = (req: any, res: any, next: any) => {
 
 // Middleware to check subscription status
 const requireActiveSubscription = (req: any, res: any, next: any) => {
+  console.log('Subscription check - User:', {
+    id: req.user?.id,
+    status: req.user?.subscriptionStatus
+  });
+
   if (!req.user.subscriptionStatus || 
       req.user.subscriptionStatus === 'expired' || 
       req.user.subscriptionStatus === 'cancelled') {
@@ -56,12 +65,19 @@ export function registerRoutes(app: Express): Server {
   // Chat routes
   console.log('Registering chat routes...');
   app.post(`${apiV1}/sessions`, requireAuth, (req, res) => {
-    console.log('Create session request received', { userId: req.user?.id });
+    console.log('Create session request received', { 
+      userId: req.user?.id,
+      sessionId: req.sessionID,
+      body: req.body 
+    });
     chatController.createSession(req, res);
   });
 
   app.get(`${apiV1}/sessions`, requireAuth, (req, res) => {
-    console.log('Get sessions request received', { userId: req.user?.id });
+    console.log('Get sessions request received', { 
+      userId: req.user?.id,
+      sessionId: req.sessionID 
+    });
     chatController.getSessions(req, res);
   });
 
@@ -75,6 +91,11 @@ export function registerRoutes(app: Express): Server {
     requireAuth,
     requireActiveSubscription,
     (req, res, next) => {
+      console.log('Add message request received', {
+        userId: req.user?.id,
+        sessionId: req.params.id,
+        hasAttachments: req.files?.length > 0
+      });
       chatController.upload(req, res, (err) => {
         if (err instanceof multer.MulterError) {
           return res.status(400).json({

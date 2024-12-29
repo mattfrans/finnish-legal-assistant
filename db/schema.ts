@@ -10,17 +10,34 @@ export const mfaMethodEnum = pgEnum('mfa_method', [
   'sms'
 ]);
 
+// Enum for user roles
+export const userRoleEnum = pgEnum('user_role', [
+  'free',
+  'professional',
+  'enterprise'
+]);
+
+// Enum for subscription status
+export const subscriptionStatusEnum = pgEnum('subscription_status', [
+  'trial',
+  'active',
+  'cancelled',
+  'expired'
+]);
+
 // Table for users with profile information
 export const users = pgTable('users', {
   id: serial('id').primaryKey(),
+  email: text('email').unique().notNull(),
   username: text('username').unique().notNull(),
   password: text('password').notNull(),
-  email: text('email').unique().notNull(),
   firstName: text('first_name'),
   lastName: text('last_name'),
   companyName: text('company_name'),
   position: text('position'),
   phoneNumber: text('phone_number'),
+  role: userRoleEnum('role').default('free').notNull(),
+  subscriptionStatus: subscriptionStatusEnum('subscription_status').default('trial').notNull(),
   lastLoginAt: timestamp('last_login_at'),
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
@@ -64,7 +81,8 @@ export const queries = pgTable('queries', {
     score: number;
     reasoning: string;
   }>().notNull(),
-  createdAt: timestamp('created_at').defaultNow().notNull()
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  attachments: json('attachments').$type<string[]>().default([])
 });
 
 // Relations
@@ -94,3 +112,9 @@ export const insertSessionSchema = createInsertSchema(sessions);
 export const selectSessionSchema = createSelectSchema(sessions);
 export const insertQuerySchema = createInsertSchema(queries);
 export const selectQuerySchema = createSelectSchema(queries);
+
+// Type exports
+export type User = typeof users.$inferSelect;
+export type InsertUser = typeof users.$inferInsert;
+export type Session = typeof sessions.$inferSelect;
+export type Query = typeof queries.$inferSelect;
