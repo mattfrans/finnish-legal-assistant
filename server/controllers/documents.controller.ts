@@ -1,17 +1,21 @@
 import { Request, Response } from 'express';
-import { db } from '@db/index';
-import { legalDocuments } from '@db/schema';
+import { db } from '../../db/index';
+import { queries } from '../../db/schema';
 import { desc, sql } from 'drizzle-orm';
 
 export class DocumentsController {
   async getRecent(req: Request, res: Response) {
     try {
-      const documents = await db.query.legalDocuments.findMany({
-        orderBy: [desc(legalDocuments.publishedAt)],
-        limit: 10
-      });
+      // For now, return recent queries that have document attachments
+      const documents = await db.select()
+        .from(queries)
+        .where(sql`attachments IS NOT NULL`)
+        .orderBy(desc(queries.createdAt))
+        .limit(10);
+
       res.json(documents);
     } catch (error) {
+      console.error('Error fetching recent documents:', error);
       res.status(500).json({ 
         error: 'Failed to fetch recent documents',
         code: 'FETCH_ERROR'
@@ -21,14 +25,16 @@ export class DocumentsController {
 
   async getPopular(req: Request, res: Response) {
     try {
-      // TODO: Implement actual popularity metrics
-      // For now, return most referenced documents
-      const documents = await db.query.legalDocuments.findMany({
-        orderBy: [desc(legalDocuments.updatedAt)],
-        limit: 10
-      });
+      // For now, return most recently accessed documents
+      const documents = await db.select()
+        .from(queries)
+        .where(sql`attachments IS NOT NULL`)
+        .orderBy(desc(queries.createdAt))
+        .limit(10);
+
       res.json(documents);
     } catch (error) {
+      console.error('Error fetching popular documents:', error);
       res.status(500).json({ 
         error: 'Failed to fetch popular documents',
         code: 'FETCH_ERROR' 
@@ -38,14 +44,16 @@ export class DocumentsController {
 
   async getCategories(req: Request, res: Response) {
     try {
-      const categories = await db.execute(
-        sql`SELECT DISTINCT metadata->>'category' as category 
-            FROM ${legalDocuments}
-            WHERE metadata->>'category' IS NOT NULL
-            ORDER BY category`
-      );
+      // For now, return hardcoded categories until we implement proper categorization
+      const categories = [
+        { category: 'Contracts' },
+        { category: 'Legal Opinions' },
+        { category: 'Court Documents' },
+        { category: 'Legislation' }
+      ];
       res.json(categories);
     } catch (error) {
+      console.error('Error fetching categories:', error);
       res.status(500).json({ 
         error: 'Failed to fetch categories',
         code: 'FETCH_ERROR'

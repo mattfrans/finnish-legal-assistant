@@ -1,16 +1,24 @@
 import { Request, Response } from 'express';
-import { db } from '@db/index';
-import { sessions, queries, feedback } from '@db/schema';
-import { desc, eq, sql } from 'drizzle-orm';
-import { LegalService } from '../services/legal';
-import { OpenAIService } from '../services/openai';
-import { type ChatSession, type Query } from '../types/api';
+import { db } from '../../db/index';
+import { sessions, queries } from '../../db/schema';
+import { desc, eq } from 'drizzle-orm';
 import multer from 'multer';
 import path from 'path';
 import fs from 'fs/promises';
+import { LegalService } from '../services/legal';
+import { OpenAIService } from '../services/openai';
+import { type Query } from '../types/api';
 
 export class ChatController {
-  // Set up file upload storage
+  private legalService: LegalService;
+  private openAIService: OpenAIService;
+
+  constructor() {
+    this.legalService = new LegalService();
+    this.openAIService = new OpenAIService();
+  }
+
+  // Upload configuration
   public upload = multer({
     storage: multer.diskStorage({
       destination: async (req, file, cb) => {
@@ -46,57 +54,20 @@ export class ChatController {
     }
   }).fields([
     { name: 'attachments', maxCount: 10 }
-  ]); // Configure multer to handle multiple files with field name 'attachments'
-  private legalService: LegalService;
-  private openAIService: OpenAIService;
-
-  constructor() {
-    this.legalService = new LegalService();
-    this.openAIService = new OpenAIService();
-  }
-
-  async getSuggestions(req: Request, res: Response) {
-    try {
-      const { messages } = req.body;
-      
-      if (!Array.isArray(messages) || !messages.every(m => 
-        typeof m === 'object' && 
-        (m.role === 'user' || m.role === 'assistant') && 
-        typeof m.content === 'string'
-      )) {
-        return res.status(400).json({
-          error: "Invalid messages format. Each message must have 'role' (user/assistant) and 'content' (string).",
-          code: "INVALID_INPUT"
-        });
-      }
-
-      const suggestions = await this.openAIService.generateChatSuggestions({ 
-        messages: messages.map(m => ({
-          role: m.role as 'user' | 'assistant',
-          content: m.content
-        }))
-      });
-
-      res.json({ suggestions });
-    } catch (error) {
-      console.error('Error generating suggestions:', error);
-      res.status(500).json({
-        error: "Failed to generate suggestions",
-        code: "SUGGESTIONS_ERROR",
-        details: error instanceof Error ? error.message : 'Unknown error'
-      });
-    }
-  }
+  ]);
 
   async createSession(req: Request, res: Response) {
     try {
       console.log('Creating new chat session...');
-      
+      console.log('User:', req.user);
+
       // Create session using Drizzle ORM
       const [session] = await db.insert(sessions)
         .values({
           title: 'New Chat',
-          createdAt: new Date()
+          userId: req.user?.id,
+          createdAt: new Date(),
+          updatedAt: new Date()
         })
         .returning();
 
@@ -115,12 +86,12 @@ export class ChatController {
 
       console.log('Sending response:', response);
       res.status(201).json(response);
-      
+
     } catch (error) {
       console.error('Error in createSession:', error);
       console.error('Error stack:', error instanceof Error ? error.stack : 'No stack available');
-      
-      res.status(500).json({ 
+
+      res.status(500).json({
         error: 'Failed to create chat session',
         details: error instanceof Error ? error.message : 'Unknown error occurred'
       });
@@ -130,6 +101,7 @@ export class ChatController {
   async getSessions(req: Request, res: Response) {
     try {
       const results = await db.query.sessions.findMany({
+        where: eq(sessions.userId, req.user?.id),
         orderBy: [desc(sessions.createdAt)],
         with: {
           queries: {
@@ -138,9 +110,10 @@ export class ChatController {
           }
         }
       });
-      res.json(sessions);
+      res.json(results);
     } catch (error) {
-      res.status(500).json({ 
+      console.error('Error fetching sessions:', error);
+      res.status(500).json({
         error: "Failed to fetch chat sessions",
         code: "FETCH_ERROR"
       });
@@ -149,32 +122,70 @@ export class ChatController {
 
   async getSession(req: Request, res: Response) {
     try {
-      const session = await db.select()
+      const sessionId = parseInt(req.params.id);
+      const [session] = await db
+        .select()
         .from(sessions)
-        .where(eq(sessions.id, parseInt(req.params.id)))
-        .leftJoin(queries, eq(queries.sessionId, sessions.id));
-      
-      if (!session || session.length === 0) {
-        return res.status(404).json({ 
+        .where(eq(sessions.id, sessionId))
+        .limit(1);
+
+      if (!session) {
+        return res.status(404).json({
           error: "Chat session not found",
           code: "NOT_FOUND"
         });
       }
 
-      const sessionData = session[0].sessions;
-      const queryList = session.map(s => s.queries).filter(q => q !== null);
-      
+      const queryList = await db
+        .select()
+        .from(queries)
+        .where(eq(queries.sessionId, sessionId))
+        .orderBy(desc(queries.createdAt));
+
       const fullSession = {
-        ...sessionData,
+        ...session,
         queries: queryList
       };
-      
+
       res.json(fullSession);
     } catch (error) {
       console.error('Error fetching chat session:', error);
-      res.status(500).json({ 
+      res.status(500).json({
         error: "Failed to fetch chat session",
         code: "FETCH_ERROR"
+      });
+    }
+  }
+
+  async getSuggestions(req: Request, res: Response) {
+    try {
+      const { messages } = req.body;
+
+      if (!Array.isArray(messages) || !messages.every(m =>
+        typeof m === 'object' &&
+        (m.role === 'user' || m.role === 'assistant') &&
+        typeof m.content === 'string'
+      )) {
+        return res.status(400).json({
+          error: "Invalid messages format. Each message must have 'role' (user/assistant) and 'content' (string).",
+          code: "INVALID_INPUT"
+        });
+      }
+
+      const suggestions = await this.openAIService.generateChatSuggestions({
+        messages: messages.map(m => ({
+          role: m.role as 'user' | 'assistant',
+          content: m.content
+        }))
+      });
+
+      res.json({ suggestions });
+    } catch (error) {
+      console.error('Error generating suggestions:', error);
+      res.status(500).json({
+        error: "Failed to generate suggestions",
+        code: "SUGGESTIONS_ERROR",
+        details: error instanceof Error ? error.message : 'Unknown error'
       });
     }
   }
@@ -186,7 +197,7 @@ export class ChatController {
       const files = ((req.files as { [fieldname: string]: Express.Multer.File[] })?.['attachments'] || []);
       const fileContents = req.body.attachmentContents || [];
       const fileTypes = req.body.attachmentTypes || [];
-      
+
       // Process attachments for storage
       const attachments = files.map(file => ({
         type: file.mimetype.startsWith('image/') ? 'image' : 'document',
@@ -205,7 +216,7 @@ export class ChatController {
         .limit(1);
 
       if (!session) {
-        return res.status(404).json({ 
+        return res.status(404).json({
           error: "Chat session not found",
           code: "NOT_FOUND"
         });
@@ -217,7 +228,7 @@ export class ChatController {
       });
 
       if (existingQueries.length === 0) {
-        const truncatedTitle = question.length > 50 
+        const truncatedTitle = question.length > 50
           ? question.substring(0, 47) + "..."
           : question;
         await db.update(sessions)
@@ -278,7 +289,7 @@ export class ChatController {
       });
     } catch (error) {
       console.error('Error processing message:', error);
-      res.status(500).json({ 
+      res.status(500).json({
         error: "Failed to process chat message",
         code: "PROCESSING_ERROR"
       });
@@ -288,14 +299,14 @@ export class ChatController {
   async getAnalysis(req: Request, res: Response) {
     try {
       const sessionId = parseInt(req.params.id);
-      
+
       const analysis = await db.query.queries.findMany({
         where: eq(queries.sessionId, sessionId),
         orderBy: [queries.createdAt]
       });
 
       if (!analysis.length) {
-        return res.status(404).json({ 
+        return res.status(404).json({
           error: "No analysis found for this session",
           code: "NOT_FOUND"
         });
@@ -305,9 +316,9 @@ export class ChatController {
       const response = {
         summary: {
           totalQueries: analysis.length,
-          averageConfidence: analysis.reduce((acc, curr) => 
+          averageConfidence: analysis.reduce((acc, curr) =>
             acc + (curr.confidence?.score || 0), 0) / analysis.length,
-          topics: Array.from(new Set(analysis.flatMap(q => 
+          topics: Array.from(new Set(analysis.flatMap(q =>
             q.sources?.map(s => s.title) || []
           ))),
         },
@@ -321,7 +332,7 @@ export class ChatController {
 
       res.json(response);
     } catch (error) {
-      res.status(500).json({ 
+      res.status(500).json({
         error: "Failed to generate session analysis",
         code: "ANALYSIS_ERROR"
       });
@@ -340,7 +351,7 @@ export class ChatController {
       }
 
       const [session] = await db.update(sessions)
-        .set({ 
+        .set({
           title: title.trim(),
           updatedAt: new Date()
         })
@@ -370,7 +381,7 @@ export class ChatController {
       const sessionId = parseInt(req.params.id);
 
       const [session] = await db.update(sessions)
-        .set({ 
+        .set({
           isPinned: isPinned,
           updatedAt: new Date()
         })
@@ -441,7 +452,7 @@ export class ChatController {
       }
 
       // Create feedback
-      const [feedback] = await db.insert(schema.feedback)
+      const [feedback] = await db.insert(queries)
         .values({
           queryId,
           rating,
