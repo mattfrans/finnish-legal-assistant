@@ -8,6 +8,7 @@ import { promisify } from "util";
 import { users, insertUserSchema } from "../db/schema";
 import { db } from "../db";
 import { eq } from "drizzle-orm";
+import { MFAService } from './services/mfa';
 
 const scryptAsync = promisify(scrypt);
 const crypto = {
@@ -47,6 +48,8 @@ declare global {
         notifications?: boolean;
         theme?: 'light' | 'dark' | 'system';
       };
+      mfaEnabled?: boolean;
+      mfaMethod?: 'totp' | 'backup';
     }
   }
 }
@@ -197,14 +200,27 @@ export function setupAuth(app: Express) {
     }
   });
 
+  const mfaService = new MFAService();
+
   app.post("/api/login", (req, res, next) => {
-    passport.authenticate("local", (err: any, user: Express.User, info: IVerifyOptions) => {
+    passport.authenticate("local", async (err: any, user: Express.User, info: IVerifyOptions) => {
       if (err) {
         return next(err);
       }
 
       if (!user) {
         return res.status(400).send(info.message ?? "Login failed");
+      }
+
+      // Check if MFA is enabled
+      if (user.mfaEnabled) {
+        req.session.mfaPending = true;
+        req.session.mfaUserId = user.id;
+
+        return res.status(200).json({
+          requiresMFA: true,
+          mfaMethod: user.mfaMethod
+        });
       }
 
       req.logIn(user, (err) => {
@@ -225,6 +241,107 @@ export function setupAuth(app: Express) {
         });
       });
     })(req, res, next);
+  });
+
+  app.post("/api/verify-mfa", async (req, res) => {
+    const { token, method } = req.body;
+    const userId = req.session.mfaUserId;
+
+    if (!userId || !req.session.mfaPending) {
+      return res.status(401).json({
+        error: "MFA verification not initiated",
+        code: "MFA_NOT_INITIATED"
+      });
+    }
+
+    try {
+      let isValid = false;
+
+      if (method === 'totp') {
+        isValid = await mfaService.verifyTOTP(userId, token);
+      } else if (method === 'backup') {
+        isValid = await mfaService.verifyBackupCode(userId, token);
+      }
+
+      if (!isValid) {
+        return res.status(401).json({
+          error: "Invalid MFA token",
+          code: "INVALID_TOKEN"
+        });
+      }
+
+      // Get user data for login
+      const [user] = await db
+        .select()
+        .from(users)
+        .where(eq(users.id, userId))
+        .limit(1);
+
+      // Complete login
+      req.session.mfaPending = false;
+      req.session.mfaUserId = undefined;
+
+      req.logIn(user, (err) => {
+        if (err) {
+          return res.status(500).json({
+            error: "Login failed after MFA",
+            code: "LOGIN_FAILED"
+          });
+        }
+
+        return res.json({
+          message: "Login successful",
+          user: {
+            id: user.id,
+            username: user.username,
+            email: user.email,
+            role: user.role,
+            subscriptionStatus: user.subscriptionStatus,
+            preferences: user.preferences
+          }
+        });
+      });
+    } catch (error) {
+      console.error('MFA verification error:', error);
+      res.status(500).json({
+        error: "MFA verification failed",
+        code: "MFA_ERROR"
+      });
+    }
+  });
+
+  app.post("/api/setup-mfa", async (req, res) => {
+    if (!req.isAuthenticated()) {
+      return res.status(401).send("Not logged in");
+    }
+
+    try {
+      const mfaData = await mfaService.setupTOTP(req.user.id);
+      res.json(mfaData);
+    } catch (error) {
+      console.error('MFA setup error:', error);
+      res.status(500).json({
+        error: "Failed to setup MFA",
+        code: "MFA_SETUP_ERROR"
+      });
+    }
+  });
+
+  app.post("/api/disable-mfa", async (req, res) => {
+    if (!req.isAuthenticated()) {
+      return res.status(401).send("Not logged in");
+    }
+
+    try {
+      await mfaService.disableMFA(req.user.id);
+      res.json({ message: "MFA disabled successfully" });
+    } catch (error) {
+      console.error('MFA disable error:', error);
+      res.status(500).json({
+        error: "Failed to disable MFA",
+        code: "MFA_DISABLE_ERROR"
+      });
+    }
   });
 
   app.post("/api/logout", (req, res) => {

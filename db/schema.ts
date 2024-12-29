@@ -17,6 +17,13 @@ export const subscriptionStatusEnum = pgEnum('subscription_status', [
   'trial'
 ]);
 
+export const mfaMethodEnum = pgEnum('mfa_method', [
+  'none',
+  'totp',
+  'email',
+  'sms'
+]);
+
 // Table for users with profile information
 export const users = pgTable('users', {
   id: serial('id').primaryKey(),
@@ -34,6 +41,11 @@ export const users = pgTable('users', {
   subscriptionExpiresAt: timestamp('subscription_expires_at'),
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
+  // Add MFA fields
+  mfaEnabled: boolean('mfa_enabled').default(false).notNull(),
+  mfaMethod: mfaMethodEnum('mfa_method').default('none').notNull(),
+  mfaSecret: text('mfa_secret'),
+  backupCodes: json('backup_codes').$type<string[]>().default([]),
   preferences: json('preferences').$type<{
     language?: 'fi' | 'en';
     notifications?: boolean;
