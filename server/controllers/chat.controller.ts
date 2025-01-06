@@ -61,11 +61,19 @@ export class ChatController {
       console.log('Creating new chat session...');
       console.log('User:', req.user);
 
+      if (!req.user?.id) {
+        console.log('No authenticated user found');
+        return res.status(401).json({
+          error: "Authentication required",
+          code: "AUTH_REQUIRED"
+        });
+      }
+
       // Create session using Drizzle ORM
       const [session] = await db.insert(sessions)
         .values({
           title: 'New Chat',
-          userId: req.user?.id,
+          userId: req.user.id,
           createdAt: new Date(),
           updatedAt: new Date()
         })
