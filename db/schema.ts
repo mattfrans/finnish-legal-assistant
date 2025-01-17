@@ -1,4 +1,4 @@
-import { pgTable, text, serial, integer, boolean, timestamp, varchar, json, pgEnum } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, integer, boolean, timestamp, varchar, json, pgEnum, index } from "drizzle-orm/pg-core";
 import { createInsertSchema, createSelectSchema } from "drizzle-zod";
 import { relations, type InferSelectModel } from "drizzle-orm";
 
@@ -61,7 +61,10 @@ export const sessions = pgTable('sessions', {
   isPinned: boolean('is_pinned').default(false).notNull(),
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull()
-});
+}, (table) => ({
+  userIdIdx: index('sessions_user_id_idx').on(table.userId),
+  createdAtIdx: index('sessions_created_at_idx').on(table.createdAt)
+}));
 
 export const queries = pgTable('queries', {
   id: serial('id').primaryKey(),
@@ -83,7 +86,11 @@ export const queries = pgTable('queries', {
   }>().notNull(),
   createdAt: timestamp('created_at').defaultNow().notNull(),
   attachments: json('attachments').$type<string[]>().default([])
-});
+}, (table) => ({
+  sessionIdIdx: index('queries_session_id_idx').on(table.sessionId),
+  userIdIdx: index('queries_user_id_idx').on(table.userId),
+  createdAtIdx: index('queries_created_at_idx').on(table.createdAt)
+}));
 
 // Relations
 export const sessionsRelations = relations(sessions, ({ many, one }) => ({

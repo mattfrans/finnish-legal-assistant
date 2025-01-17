@@ -7,6 +7,20 @@ import { DocumentsController } from "./controllers/documents.controller";
 import { ChatController } from "./controllers/chat.controller";
 import { TemplatesController } from "./controllers/templates.controller";
 import { LegalService } from "./services/legal";
+import rateLimit from 'express-rate-limit';
+
+// Rate limiters
+const apiLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 100, // Limit each IP to 100 requests per windowMs
+  message: { error: 'Too many requests, please try again later', code: 'RATE_LIMIT_EXCEEDED' }
+});
+
+const chatLimiter = rateLimit({
+  windowMs: 60 * 1000, // 1 minute
+  max: 10, // Limit each IP to 10 chat requests per minute
+  message: { error: 'Too many chat requests, please try again later', code: 'CHAT_RATE_LIMIT_EXCEEDED' }
+});
 
 // Middleware to ensure user is authenticated
 const requireAuth = (req: any, res: any, next: any) => {
@@ -64,7 +78,7 @@ export function registerRoutes(app: Express): Server {
   // Protected routes
   // Chat routes
   console.log('Registering chat routes...');
-  app.post(`${apiV1}/sessions`, requireAuth, (req, res) => {
+  app.post(`${apiV1}/sessions`, apiLimiter, chatLimiter, requireAuth, (req, res) => {
     console.log('Create session request received', { 
       userId: req.user?.id,
       sessionId: req.sessionID,
@@ -73,7 +87,7 @@ export function registerRoutes(app: Express): Server {
     chatController.createSession(req, res);
   });
 
-  app.get(`${apiV1}/sessions`, requireAuth, (req, res) => {
+  app.get(`${apiV1}/sessions`, apiLimiter, requireAuth, (req, res) => {
     console.log('Get sessions request received', { 
       userId: req.user?.id,
       sessionId: req.sessionID 
@@ -81,13 +95,15 @@ export function registerRoutes(app: Express): Server {
     chatController.getSessions(req, res);
   });
 
-  app.get(`${apiV1}/sessions/:id`, requireAuth, (req, res) => chatController.getSession(req, res));
-  app.patch(`${apiV1}/sessions/:id`, requireAuth, (req, res) => chatController.updateSession(req, res));
-  app.delete(`${apiV1}/sessions/:id`, requireAuth, (req, res) => chatController.deleteSession(req, res));
-  app.put(`${apiV1}/sessions/:id/pin`, requireAuth, (req, res) => chatController.togglePin(req, res));
+  app.get(`${apiV1}/sessions/:id`, apiLimiter, requireAuth, (req, res) => chatController.getSession(req, res));
+  app.patch(`${apiV1}/sessions/:id`, apiLimiter, requireAuth, (req, res) => chatController.updateSession(req, res));
+  app.delete(`${apiV1}/sessions/:id`, apiLimiter, requireAuth, (req, res) => chatController.deleteSession(req, res));
+  app.put(`${apiV1}/sessions/:id/pin`, apiLimiter, requireAuth, (req, res) => chatController.togglePin(req, res));
 
   // Chat message routes (require active subscription for advanced features)
   app.post(`${apiV1}/sessions/:id/chat`, 
+    apiLimiter,
+    chatLimiter,
     requireAuth,
     requireActiveSubscription,
     (req, res, next) => {
@@ -116,22 +132,22 @@ export function registerRoutes(app: Express): Server {
 
   // Legal routes (require active subscription)
   console.log('Registering legal routes...');
-  app.get(`${apiV1}/legal/search`, requireAuth, requireActiveSubscription, (req, res) => legalController.search(req, res));
-  app.get(`${apiV1}/legal/statutes`, requireAuth, requireActiveSubscription, (req, res) => legalController.getStatutes(req, res));
-  app.get(`${apiV1}/legal/guidelines`, requireAuth, requireActiveSubscription, (req, res) => legalController.getGuidelines(req, res));
+  app.get(`${apiV1}/legal/search`, apiLimiter, requireAuth, requireActiveSubscription, (req, res) => legalController.search(req, res));
+  app.get(`${apiV1}/legal/statutes`, apiLimiter, requireAuth, requireActiveSubscription, (req, res) => legalController.getStatutes(req, res));
+  app.get(`${apiV1}/legal/guidelines`, apiLimiter, requireAuth, requireActiveSubscription, (req, res) => legalController.getGuidelines(req, res));
 
   // Document routes
-  app.get(`${apiV1}/documents/recent`, requireAuth, (req, res) => documentsController.getRecent(req, res));
-  app.get(`${apiV1}/documents/popular`, requireAuth, (req, res) => documentsController.getPopular(req, res));
-  app.get(`${apiV1}/documents/categories`, requireAuth, (req, res) => documentsController.getCategories(req, res));
+  app.get(`${apiV1}/documents/recent`, apiLimiter, requireAuth, (req, res) => documentsController.getRecent(req, res));
+  app.get(`${apiV1}/documents/popular`, apiLimiter, requireAuth, (req, res) => documentsController.getPopular(req, res));
+  app.get(`${apiV1}/documents/categories`, apiLimiter, requireAuth, (req, res) => documentsController.getCategories(req, res));
 
   // Template routes (require active subscription)
-  app.get(`${apiV1}/templates`, requireAuth, requireActiveSubscription, (req, res) => templatesController.getTemplates(req, res));
-  app.get(`${apiV1}/templates/:id`, requireAuth, requireActiveSubscription, (req, res) => templatesController.getTemplate(req, res));
+  app.get(`${apiV1}/templates`, apiLimiter, requireAuth, requireActiveSubscription, (req, res) => templatesController.getTemplates(req, res));
+  app.get(`${apiV1}/templates/:id`, apiLimiter, requireAuth, requireActiveSubscription, (req, res) => templatesController.getTemplate(req, res));
 
   // Feedback and analysis routes
-  app.post(`${apiV1}/sessions/:id/queries/:queryId/feedback`, requireAuth, (req, res) => chatController.addFeedback(req, res));
-  app.get(`${apiV1}/sessions/:id/analysis`, requireAuth, requireActiveSubscription, (req, res) => chatController.getAnalysis(req, res));
+  app.post(`${apiV1}/sessions/:id/queries/:queryId/feedback`, apiLimiter, requireAuth, (req, res) => chatController.addFeedback(req, res));
+  app.get(`${apiV1}/sessions/:id/analysis`, apiLimiter, requireAuth, requireActiveSubscription, (req, res) => chatController.getAnalysis(req, res));
 
   // Error handling middleware
   app.use((err: any, req: any, res: any, next: any) => {
