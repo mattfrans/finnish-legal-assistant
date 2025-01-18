@@ -114,7 +114,6 @@ export class LegalService {
       return {
         answer: legalResponse.answer,
         sources: sources,
-        legalContext: contextAnalysis.context,
         confidence: legalResponse.confidence,
         fileAnalysis: files ? await this.analyzeUploadedFiles(files) : undefined
       };

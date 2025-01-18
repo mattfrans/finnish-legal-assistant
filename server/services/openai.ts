@@ -1,6 +1,5 @@
 import OpenAI from "openai";
 
-// the newest OpenAI model is "gpt-4o" which was released May 13, 2024. do not change this unless explicitly requested by the user
 if (!process.env.OPENAI_API_KEY) {
   throw new Error('OPENAI_API_KEY environment variable is required');
 }
@@ -49,55 +48,36 @@ Required elements:
 - Focus on real-world applications in Finland
 Style example: "Kuluttajansuojalain mukaan sinulla on kuluttajana seuraavat oikeudet tässä tilanteessa..."`,
 
-  selkokieli: `You are an AI legal assistant specializing in Finnish law (Suomen laki), communicating in Plain Finnish (selkokieli).
-Follow Finnish Plain Language (selkokieli) principles for maximum accessibility.
-Use simple Finnish sentence structures, common words, and concrete examples from everyday Finnish life.
-Format responses in short paragraphs with clear headings and step-by-step instructions.
-Target audience: Finnish speakers needing simplified language, including elderly, language learners, and those with reading difficulties.
+  regular: `You are an AI legal assistant specializing in Finnish law (Suomen laki), communicating in English.
+Provide clear explanations of Finnish law and legal concepts in English.
+Include relevant legal information while maintaining clarity and accessibility.
+Format responses in clear, well-structured English with explanations of Finnish legal terms.
+Target audience: International professionals and English-speaking residents in Finland.
 Required elements:
-- Use Plain Finnish (selkokieli) principles
-- Keep sentences short and simple
-- Use common Finnish words
-- Explain one thing at a time
-- Provide clear, concrete action steps
-Style example: "Laki suojaa sinua, kun ostat tavaroita kaupasta. Tässä kerromme selkeästi, mitä oikeuksia sinulla on..."`,
-
-  crazy: `You are an AI legal assistant specializing in Finnish law (Suomen laki), communicating in an entertaining and engaging way.
-Use creative analogies, humor, and playful language while maintaining accuracy of legal information.
-Include fun examples, memorable explanations, and engaging scenarios to explain legal concepts.
-Format responses in an entertaining style with emoji, casual language, and pop culture references.
-Target audience: Users who prefer engaging, informal communication.
-Required elements:
-- Use emojis and casual language
-- Create fun analogies and metaphors
-- Reference pop culture when relevant
-- Make legal concepts entertaining
-- Keep information accurate despite playful tone
-Style example: "🤔 Imagine if the Finnish Consumer Protection Act was a superhero - let's call them KuluttajaMan! 🦸‍♂️ Their superpower is..."`,
+- Use clear, professional English
+- Explain Finnish legal concepts in English terms
+- Provide practical examples relevant to Finland
+- Include original Finnish terms in parentheses when relevant
+- Focus on real-world applications in Finland
+Style example: "According to the Finnish Consumer Protection Act (Kuluttajansuojalaki), you have the following rights in this situation..."`
 };
 
-const BASE_SYSTEM_PROMPT = `Your primary focus is helping users understand Finnish legal concepts, rights, and obligations.
-
-Key responsibilities:
-1. Provide accurate information based on current Finnish legislation
-2. Reference specific laws and regulations from Finlex when applicable
-3. Include consumer protection guidelines from KKV (Kilpailu- ja kuluttajavirasto) when relevant
-4. Express confidence levels and reasoning for your answers
-5. If you're unsure about something, clearly state it and suggest consulting a legal professional
-
+const BASE_SYSTEM_PROMPT = `Analyze legal questions in the context of Finnish law and provide accurate, well-reasoned responses.
+Include relevant citations to Finnish legislation, case law, and legal practice.
 Format your response as a JSON object with the following structure:
+
 {
-  "answer": "Your detailed response in Finnish and English",
+  "answer": "Your detailed response here",
   "confidence": {
     "score": "Number between 0 and 1",
     "reasoning": "Explanation of your confidence level"
   },
   "sources": [
     {
-      "title": "Name of the law or guideline",
-      "link": "URL to the source",
-      "section": "Specific section if applicable",
-      "type": "finlex or kkv or other",
+      "title": "Source title",
+      "link": "URL to Finlex or other official source",
+      "section": "Relevant section or paragraph",
+      "type": "finlex | kkv | other",
       "relevance": "Number between 0 and 1"
     }
   ]
@@ -110,13 +90,12 @@ export class OpenAIService {
       const systemPrompt = `${modePrompt}\n\n${BASE_SYSTEM_PROMPT}`;
       
       const response = await openai.chat.completions.create({
-        model: "gpt-4o",
+        model: "gpt-4",
         messages: [
           { role: "system", content: systemPrompt },
           { role: "user", content: query }
         ],
-        temperature: languageMode === 'crazy' ? 0.9 : 0.7,
-        response_format: { type: "json_object" }
+        temperature: 0.7
       });
 
       const content = response.choices[0].message.content;
@@ -124,48 +103,39 @@ export class OpenAIService {
         throw new Error("Empty response from OpenAI");
       }
 
-      const result = JSON.parse(content);
-      
-      // Validate and clean the response
-      return {
-        answer: result.answer,
-        confidence: {
-          score: Math.max(0, Math.min(1, result.confidence.score)),
-          reasoning: result.confidence.reasoning
-        },
-        sources: result.sources?.map(source => ({
-          title: source.title,
-          link: source.link,
-          section: source.section,
-          type: source.type as 'finlex' | 'kkv' | 'other',
-          relevance: Math.max(0, Math.min(1, source.relevance))
-        }))
-      };
+      try {
+        const result = JSON.parse(content);
+        return {
+          answer: result.answer,
+          confidence: {
+            score: Math.max(0, Math.min(1, result.confidence.score)),
+            reasoning: result.confidence.reasoning
+          },
+          sources: result.sources?.map(source => ({
+            title: source.title,
+            link: source.link,
+            section: source.section,
+            type: source.type as 'finlex' | 'kkv' | 'other',
+            relevance: Math.max(0, Math.min(1, source.relevance))
+          }))
+        };
+      } catch (parseError) {
+        // If parsing fails, return a formatted response
+        return {
+          answer: content,
+          confidence: {
+            score: 0.7,
+            reasoning: "Response format was non-standard"
+          }
+        };
+      }
     } catch (error) {
       console.error('Error generating legal response:', error);
       throw new Error('Failed to generate legal response');
     }
   }
 
-  async analyzeLegalContext(query: string, files?: Array<{ type: string, content: string, name: string }>): Promise<{
-    answer: string;
-    confidence: {
-      score: number;
-      reasoning: string;
-    };
-    sources?: Array<{
-      title: string;
-      link: string;
-      section?: string;
-      type: 'finlex' | 'kkv' | 'other';
-      relevance: number;
-    }>;
-    fileAnalysis?: Array<{
-      analysis: string;
-      type: string;
-      name: string;
-    }>;
-  }> {
+  async analyzeLegalContext(query: string, files?: Array<{ type: string, content: string, name: string }>) {
     try {
       // First analyze any attached files
       let fileAnalyses: Array<{ analysis: string; type: string; name: string }> = [];
@@ -192,7 +162,7 @@ export class OpenAIService {
 
       // Then generate the main legal response
       const response = await openai.chat.completions.create({
-        model: "gpt-4o",
+        model: "gpt-4",
         messages: [
           { 
             role: "system", 
@@ -200,155 +170,16 @@ export class OpenAIService {
           },
           { 
             role: "user", 
-            content: `Query: ${query}\n${
+            content: `Question: ${query}${
               fileAnalyses.length > 0 
-                ? `\nDocument Analyses:\n${fileAnalyses.map((f, i) => `Document ${i + 1}: ${f.analysis}`).join('\n')}`
+                ? '\n\nDocument Analyses:\n' + fileAnalyses.map(f => 
+                    `\n${f.name}:\n${f.analysis}`
+                  ).join('\n')
                 : ''
             }`
           }
         ],
-        temperature: 0.7,
-        response_format: { type: "json_object" }
-      });
-
-      const result = JSON.parse(response.choices[0].message.content!);
-      
-      return {
-        answer: result.answer,
-        confidence: {
-          score: Math.max(0, Math.min(1, result.confidence.score)),
-          reasoning: result.confidence.reasoning
-        },
-        sources: result.sources?.map((source: { 
-          title: string;
-          link: string;
-          section?: string;
-          type: string;
-          relevance: number;
-        }) => ({
-          title: source.title,
-          link: source.link,
-          section: source.section,
-          type: source.type as 'finlex' | 'kkv' | 'other',
-          relevance: Math.max(0, Math.min(1, source.relevance))
-        })),
-        fileAnalysis: fileAnalyses
-      };
-    } catch (error) {
-      console.error('Error analyzing legal context:', error);
-      throw new Error('Failed to analyze legal context');
-    }
-  }
-
-  async analyzeImage(base64Image: string): Promise<string> {
-    try {
-      const response = await openai.chat.completions.create({
-        model: "gpt-4o",
-        messages: [
-          {
-            role: "system",
-            content: `You are a Finnish legal assistant analyzing images. 
-            Output your analysis in Finnish.
-            Focus on:
-            1. Any text visible in the image
-            2. Type of document or content shown
-            3. Legally relevant details
-            4. Potential legal implications
-            
-            Format your response in clear, structured Finnish.`
-          },
-          {
-            role: "user",
-            content: [
-              {
-                type: "text",
-                text: "Analyze this image in detail, describing its contents and any potential legal relevance:"
-              },
-              {
-                type: "image_url",
-                image_url: {
-                  url: `data:image/jpeg;base64,${base64Image}`
-                }
-              }
-            ]
-          }
-        ],
-        temperature: 0.7,
-        max_tokens: 1000
-      });
-
-      const analysis = response.choices[0].message.content;
-      if (!analysis) {
-        throw new Error("Empty response from OpenAI");
-      }
-
-      return analysis;
-    } catch (error) {
-      console.error('Error analyzing image:', error);
-      return 'Kuvan analysoinnissa tapahtui virhe. Ole hyvä ja yritä uudelleen.';
-    }
-  }
-
-  async analyzeLegalDocument(content: string): Promise<string> {
-    try {
-      const response = await openai.chat.completions.create({
-        model: "gpt-4o",
-        messages: [
-          {
-            role: "system",
-            content: `You are a Finnish legal assistant analyzing legal documents. Output your analysis in Finnish.
-            Focus on:
-            1. Key legal points and implications
-            2. Relevant Finnish laws and regulations
-            3. Potential risks or compliance issues
-            4. Recommendations based on Finnish legal framework
-            
-            Respond in a structured format with clear sections.`
-          },
-          {
-            role: "user",
-            content: `Analyze the following document content in the context of Finnish law:\n\n${content}`
-          }
-        ],
-        max_tokens: 1000,
-        temperature: 0.7,
-        response_format: { type: "json_object" }
-      });
-
-      const result = JSON.parse(response.choices[0].message.content!);
-      return result.analysis || 'Asiakirjan analyysiä ei voitu suorittaa';
-    } catch (error) {
-      console.error('Error analyzing document:', error);
-      return 'Asiakirjan analysoinnissa tapahtui virhe';
-    }
-  }
-
-  async generateChatSuggestions(context: { messages: Array<{ role: "user" | "assistant"; content: string }> }): Promise<string[]> {
-    try {
-      const response = await openai.chat.completions.create({
-        model: "gpt-4o",
-        messages: [
-          {
-            role: "system",
-            content: `You are a Finnish legal assistant. Based on the conversation history, generate 3 relevant follow-up questions that the user might want to ask. Focus on Finnish law and regulations. The questions should be specific and contextual to the previous conversation.
-
-Output a JSON object with this structure:
-{
-  "suggestions": [
-    "specific question 1",
-    "specific question 2",
-    "specific question 3"
-  ]
-}`
-          },
-          ...context.messages.slice(-3),
-          {
-            role: "user",
-            content: "Based on our conversation, what are 3 specific follow-up questions I might want to ask?"
-          }
-        ],
-        temperature: 0.7,
-        response_format: { type: "json_object" }
+        temperature: 0.7
       });
 
       const content = response.choices[0].message.content;
@@ -356,15 +187,107 @@ Output a JSON object with this structure:
         throw new Error("Empty response from OpenAI");
       }
 
-      const result = JSON.parse(content);
-      return result.suggestions || [];
+      try {
+        const result = JSON.parse(content);
+        return {
+          ...result,
+          fileAnalysis: fileAnalyses
+        };
+      } catch (parseError) {
+        // If parsing fails, return a formatted response
+        return {
+          answer: content,
+          confidence: {
+            score: 0.7,
+            reasoning: "Response format was non-standard"
+          },
+          fileAnalysis: fileAnalyses
+        };
+      }
     } catch (error) {
-      console.error('Error generating chat suggestions:', error);
-      return [
-        "Could you explain more about my legal rights in this situation?",
-        "What are the specific requirements under Finnish law?",
-        "Are there any relevant precedent cases I should know about?"
-      ];
+      console.error('Error analyzing legal context:', error);
+      throw new Error('Failed to analyze legal context');
+    }
+  }
+
+  private async analyzeImage(base64Image: string): Promise<string> {
+    try {
+      const response = await openai.chat.completions.create({
+        model: "gpt-4-vision-preview",
+        messages: [
+          {
+            role: "user",
+            content: [
+              {
+                type: "text",
+                text: "Analyze this image in the context of Finnish law. What legal documents, forms, or relevant information do you see?"
+              },
+              {
+                type: "image_url",
+                image_url: {
+                  url: base64Image
+                }
+              }
+            ]
+          }
+        ],
+        max_tokens: 500
+      });
+
+      return response.choices[0].message.content || '';
+    } catch (error) {
+      console.error('Error analyzing image:', error);
+      throw new Error('Failed to analyze image');
+    }
+  }
+
+  private async analyzeLegalDocument(content: string): Promise<string> {
+    try {
+      const response = await openai.chat.completions.create({
+        model: "gpt-4",
+        messages: [
+          {
+            role: "system",
+            content: "You are a Finnish legal document analyzer. Extract and summarize key legal points, obligations, rights, and requirements from the document. Focus on relevance to Finnish law."
+          },
+          {
+            role: "user",
+            content
+          }
+        ],
+        temperature: 0.3,
+        max_tokens: 500
+      });
+
+      return response.choices[0].message.content || '';
+    } catch (error) {
+      console.error('Error analyzing document:', error);
+      throw new Error('Failed to analyze document');
+    }
+  }
+
+  async generateChatSuggestions(context: { messages: Array<{ role: "user" | "assistant"; content: string }> }): Promise<string[]> {
+    try {
+      const response = await openai.chat.completions.create({
+        model: "gpt-4",
+        messages: [
+          {
+            role: "system",
+            content: "You are a Finnish legal assistant. Based on the conversation history, suggest 3 relevant follow-up questions the user might want to ask. Make them specific to Finnish law and the current context."
+          },
+          ...context.messages.map(m => ({
+            role: m.role,
+            content: m.content
+          }))
+        ],
+        temperature: 0.7,
+        n: 3
+      });
+
+      return response.choices.map(choice => choice.message.content || '').filter(Boolean);
+    } catch (error) {
+      console.error('Error generating suggestions:', error);
+      throw new Error('Failed to generate suggestions');
     }
   }
 }

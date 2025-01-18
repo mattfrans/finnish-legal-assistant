@@ -22,13 +22,47 @@ interface ChatInterfaceProps {
 
 export function ChatInterface({ initialSessionId }: ChatInterfaceProps) {
   const [messages, setMessages] = useState<Message[]>([]);
-  const [sessionId, setSessionId] = useState<number | null>(null);
+  const [sessionId, setSessionId] = useState<number | null>(initialSessionId || null);
   const [attachments, setAttachments] = useState<FileAttachment[]>([]);
   const [languageMode, setLanguageMode] = useState<LanguageMode>('regular');
   const [showRenameDialog, setShowRenameDialog] = useState(false);
   const [isInitialized, setIsInitialized] = useState(false);
   const { toast } = useToast();
   const queryClient = useQueryClient();
+
+  // Create a new session if none exists
+  const createSession = useMutation({
+    mutationFn: async () => {
+      const res = await fetch('/api/v1/sessions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+      if (!res.ok) throw new Error('Failed to create session');
+      return res.json();
+    },
+    onSuccess: (data) => {
+      setSessionId(data.id);
+      setIsInitialized(true);
+    },
+    onError: (error) => {
+      toast({
+        title: "Error",
+        description: "Failed to initialize chat. Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Initialize session
+  useEffect(() => {
+    if (!sessionId) {
+      createSession.mutate();
+    } else {
+      setIsInitialized(true);
+    }
+  }, [sessionId]);
 
   // Cleanup URLs when component unmounts or attachments change
   useEffect(() => {

@@ -1,6 +1,6 @@
-import { drizzle } from "drizzle-orm/neon-serverless";
-import { sql } from "drizzle-orm";
-import ws from "ws";
+import { drizzle } from 'drizzle-orm/node-postgres';
+import pkg from 'pg';
+const { Pool } = pkg;
 import * as schema from "./schema";
 
 if (!process.env.DATABASE_URL) {
@@ -11,16 +11,18 @@ if (!process.env.DATABASE_URL) {
 
 console.log('Initializing database connection...');
 
-export const db = drizzle({
-  connection: process.env.DATABASE_URL,
-  schema,
-  ws: ws,
+const pool = new Pool({
+  connectionString: process.env.DATABASE_URL,
 });
+
+export const db = drizzle(pool, { schema });
 
 // Test the connection
 const testConnection = async () => {
   try {
-    const result = await db.execute(sql`SELECT 1`);
+    const client = await pool.connect();
+    await client.query('SELECT 1');
+    client.release();
     console.log('Database connection test successful');
   } catch (error) {
     console.error('Database connection test failed:', error);

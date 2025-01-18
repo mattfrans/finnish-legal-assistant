@@ -1,6 +1,6 @@
 import { Request, Response } from 'express';
 import { db } from '../../db/index';
-import { sessions, queries } from '../../db/schema';
+import { sessions, queries, users } from '../../db/schema';
 import { desc, eq } from 'drizzle-orm';
 import multer from 'multer';
 import path from 'path';
@@ -59,21 +59,45 @@ export class ChatController {
   async createSession(req: Request, res: Response) {
     try {
       console.log('Creating new chat session...');
-      console.log('User:', req.user);
+      
+      // For development, create or get the dev user
+      let userId: number;
+      
+      if (process.env.NODE_ENV === 'development') {
+        const [devUser] = await db.insert(users)
+          .values({
+            email: 'dev@example.com',
+            username: 'dev_user',
+            password: 'dev_password',
+            role: 'free',
+            subscriptionStatus: 'trial',
+            createdAt: new Date(),
+            updatedAt: new Date()
+          })
+          .onConflictDoUpdate({
+            target: users.email,
+            set: {
+              updatedAt: new Date()
+            }
+          })
+          .returning();
 
-      if (!req.user?.id) {
-        console.log('No authenticated user found');
-        return res.status(401).json({
-          error: "Authentication required",
-          code: "AUTH_REQUIRED"
-        });
+        userId = devUser.id;
+      } else {
+        if (!req.user?.id) {
+          return res.status(401).json({
+            error: "Authentication required",
+            code: "AUTH_REQUIRED"
+          });
+        }
+        userId = req.user.id;
       }
 
       // Create session using Drizzle ORM
       const [session] = await db.insert(sessions)
         .values({
           title: 'New Chat',
-          userId: req.user.id,
+          userId: userId,
           createdAt: new Date(),
           updatedAt: new Date()
         })
@@ -98,10 +122,9 @@ export class ChatController {
     } catch (error) {
       console.error('Error in createSession:', error);
       console.error('Error stack:', error instanceof Error ? error.stack : 'No stack available');
-
       res.status(500).json({
         error: 'Failed to create chat session',
-        details: error instanceof Error ? error.message : 'Unknown error occurred'
+        details: error instanceof Error ? error.message : 'Unknown error'
       });
     }
   }
