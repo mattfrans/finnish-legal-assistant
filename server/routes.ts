@@ -8,6 +8,7 @@ import { ChatController } from "./controllers/chat.controller";
 import { TemplatesController } from "./controllers/templates.controller";
 import { LegalService } from "./services/legal";
 import rateLimit from 'express-rate-limit';
+import { PaymentController } from './controllers/payment.controller';
 
 // Rate limiters
 const apiLimiter = rateLimit({
@@ -70,6 +71,7 @@ export function registerRoutes(app: Express): Server {
   const documentsController = new DocumentsController();
   const chatController = new ChatController();
   const templatesController = new TemplatesController();
+  const paymentController = new PaymentController();
 
   // Set up authentication
   setupAuth(app);
@@ -152,6 +154,12 @@ export function registerRoutes(app: Express): Server {
   // Template routes (require active subscription)
   app.get(`${apiV1}/templates`, apiLimiter, requireAuth, requireActiveSubscription, (req, res) => templatesController.getTemplates(req, res));
   app.get(`${apiV1}/templates/:id`, apiLimiter, requireAuth, requireActiveSubscription, (req, res) => templatesController.getTemplate(req, res));
+
+  // Payment routes
+  app.get(`${apiV1}/subscription-plans`, apiLimiter, requireAuth, paymentController.getSubscriptionPlans);
+  app.post(`${apiV1}/create-checkout-session`, apiLimiter, requireAuth, paymentController.createCheckoutSession);
+  app.post(`${apiV1}/create-portal-session`, apiLimiter, requireAuth, paymentController.createPortalSession);
+  app.post(`${apiV1}/webhook`, express.raw({ type: 'application/json' }), paymentController.handleWebhook);
 
   // Feedback and analysis routes
   app.post(`${apiV1}/sessions/:id/queries/:queryId/feedback`, apiLimiter, requireAuth, (req, res) => chatController.addFeedback(req, res));

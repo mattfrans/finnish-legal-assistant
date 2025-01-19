@@ -1,0 +1,19 @@
+{
+  "buildCommand": "cd client && npm install && npm run build",
+  "outputDirectory": "client/dist",
+  "framework": "vite",
+  "rewrites": [
+    {
+      "source": "/api/:path*",
+      "destination": "https://finnish-legal-ai-production.up.railway.app/api/:path*"
+    }
+  ],
+  "env": {
+    "VITE_API_URL": "https://finnish-legal-ai-production.up.railway.app",
+    "VITE_WS_URL": "wss://finnish-legal-ai-production.up.railway.app"
+  },
+  "github": {
+    "enabled": true,
+    "silent": true
+  }
+}
