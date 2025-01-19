@@ -1,73 +1,72 @@
-import { useState } from "react";
-import { Button } from "@/components/ui/button";
-import { Textarea } from "@/components/ui/textarea";
-import { Send } from "lucide-react";
-import { FileUpload } from "./FileUpload";
-import { LanguageSelector } from "./LanguageSelector";
-import type { FileAttachment } from "./types";
-import type { LanguageMode } from "./types";
+import React, { useState } from 'react';
+import { Send } from 'lucide-react';
+import { Button } from '../ui/button';
+import { Textarea } from '../ui/textarea';
+import FileUpload from './FileUpload';
+import LanguageSelector from './LanguageSelector';
+import { FileAttachment, LanguageMode } from '../../types';
 
 interface InputAreaProps {
-  onSubmit: (input: string) => void;
-  onFileSelect: (files: FileList) => void;
-  attachments: FileAttachment[];
-  onRemoveAttachment: (index: number) => void;
-  languageMode: LanguageMode;
-  onLanguageChange: (mode: LanguageMode) => void;
+  onSubmit: (message: string) => void;
   isLoading?: boolean;
 }
 
-export function InputArea({
-  onSubmit,
-  onFileSelect,
-  attachments,
-  onRemoveAttachment,
-  languageMode,
-  onLanguageChange,
-  isLoading
-}: InputAreaProps) {
-  const [input, setInput] = useState("");
+const InputArea: React.FC<InputAreaProps> = ({ onSubmit, isLoading }) => {
+  const [message, setMessage] = useState('');
+  const [attachments, setAttachments] = useState<FileAttachment[]>([]);
+  const [languageMode, setLanguageMode] = useState<LanguageMode>('finnish');
 
-  const handleSubmit = () => {
-    const trimmedInput = input.trim();
-    if (!trimmedInput && attachments.length === 0) return;
-    onSubmit(trimmedInput);
-    setInput("");
-  };
-
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === "Enter" && !e.shiftKey) {
-      e.preventDefault();
-      handleSubmit();
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (message.trim()) {
+      onSubmit(message);
+      setMessage('');
     }
   };
 
+  const handleFileSelect = (files: FileList) => {
+    const newAttachments: FileAttachment[] = Array.from(files).map(file => ({
+      file,
+      preview: URL.createObjectURL(file)
+    }));
+    setAttachments([...attachments, ...newAttachments]);
+  };
+
+  const handleRemoveAttachment = (index: number) => {
+    const newAttachments = [...attachments];
+    if (newAttachments[index]?.preview) {
+      URL.revokeObjectURL(newAttachments[index].preview!);
+    }
+    newAttachments.splice(index, 1);
+    setAttachments(newAttachments);
+  };
+
   return (
-    <div className="border-t p-4 space-y-4">
-      <div className="flex items-center space-x-2">
+    <form onSubmit={handleSubmit} className="flex flex-col gap-2 p-4 border-t">
+      <div className="flex gap-2">
         <FileUpload
-          onFileSelect={onFileSelect}
+          onFileSelect={handleFileSelect}
           attachments={attachments}
-          onRemoveAttachment={onRemoveAttachment}
+          onRemoveAttachment={handleRemoveAttachment}
         />
-        <LanguageSelector value={languageMode} onChange={onLanguageChange} />
+        <LanguageSelector
+          value={languageMode}
+          onChange={setLanguageMode}
+        />
       </div>
-      <div className="flex space-x-2">
+      <div className="flex gap-2">
         <Textarea
-          value={input}
-          onChange={(e) => setInput(e.target.value)}
-          onKeyDown={handleKeyDown}
+          value={message}
+          onChange={(e) => setMessage(e.target.value)}
           placeholder="Type your message..."
           className="flex-1"
-          rows={1}
         />
-        <Button 
-          onClick={handleSubmit}
-          disabled={isLoading || (!input.trim() && attachments.length === 0)}
-        >
-          <Send className="h-4 w-4" />
+        <Button type="submit" disabled={isLoading}>
+          <Send className="w-4 h-4" />
         </Button>
       </div>
-    </div>
+    </form>
   );
-}
+};
+
+export default InputArea;

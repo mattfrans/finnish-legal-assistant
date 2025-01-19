@@ -4,15 +4,15 @@ import { formatDistanceToNow } from "date-fns";
 import { ChatInterface } from "@/components/chat/ChatInterface";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Card } from "@/components/ui/card";
 import { ChevronRight, MessageCircle, Pin, Pencil, Trash2, FileText } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 
 interface ChatSession {
-  id: number;
+  id: string;
   title: string;
   isPinned: boolean;
   createdAt: string;
@@ -77,7 +77,7 @@ function RenameChatDialog({ session, onClose }: RenameChatDialogProps) {
 }
 
 export function History() {
-  const [selectedSession, setSelectedSession] = useState<number | null>(null);
+  const [selectedSession, setSelectedSession] = useState<string | null>(null);
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -87,7 +87,7 @@ export function History() {
   });
 
   const togglePin = useMutation({
-    mutationFn: async ({ id, isPinned }: { id: number; isPinned: boolean }) => {
+    mutationFn: async ({ id, isPinned }: { id: string; isPinned: boolean }) => {
       const res = await fetch(`/api/v1/sessions/${id}/pin`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
@@ -110,7 +110,7 @@ export function History() {
   });
 
   const deleteChat = useMutation({
-    mutationFn: async (id: number) => {
+    mutationFn: async (id: string) => {
       const res = await fetch(`/api/v1/sessions/${id}`, {
         method: 'DELETE',
       });
