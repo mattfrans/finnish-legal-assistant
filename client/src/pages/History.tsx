@@ -13,19 +13,13 @@ import {
 } from '../components/ui/dialog';
 import { FileText, Search, X } from 'lucide-react';
 import { ScrollArea } from '../components/ui/scroll-area';
+import { Message } from '../types';
 
 interface ChatSession {
   id: number;
   title: string;
   createdAt: string;
-  messages: ChatMessage[];
-}
-
-interface ChatMessage {
-  id: string;
-  content: string;
-  role: 'user' | 'assistant';
-  createdAt: string;
+  messages: Message[];
 }
 
 export function History() {
@@ -161,7 +155,7 @@ export function History() {
               <div className="space-y-4">
                 {sessions
                   .find((s: ChatSession) => s.id === selectedSession)
-                  ?.messages.map((message) => (
+                  ?.messages.map((message: Message) => (
                     <div
                       key={message.id}
                       className={`p-3 rounded-lg ${

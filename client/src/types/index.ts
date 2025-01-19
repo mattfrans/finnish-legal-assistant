@@ -15,3 +15,12 @@ export interface LanguageSelectorProps {
   value: LanguageMode;
   onChange: (mode: LanguageMode) => void;
 }
+
+export interface Message {
+  id: string;
+  content: string;
+  role: 'user' | 'assistant';
+  createdAt: string;
+  attachments?: { name: string; url: string }[];
+  sources?: string[];
+}
