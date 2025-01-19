@@ -2,8 +2,6 @@ import React, { useState } from 'react';
 import { Send } from 'lucide-react';
 import { Button } from '../ui/button';
 import { Textarea } from '../ui/textarea';
-import { FileUpload } from './FileUpload';
-import { LanguageSelector } from './LanguageSelector';
 import { FileAttachment, LanguageMode } from '../../types';
 
 interface InputAreaProps {
@@ -13,8 +11,6 @@ interface InputAreaProps {
 
 export function InputArea({ onSubmit, isLoading }: InputAreaProps) {
   const [message, setMessage] = useState('');
-  const [attachments, setAttachments] = useState<FileAttachment[]>([]);
-  const [languageMode, setLanguageMode] = useState<LanguageMode>('finnish');
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -24,36 +20,8 @@ export function InputArea({ onSubmit, isLoading }: InputAreaProps) {
     }
   };
 
-  const handleFileSelect = (files: FileList) => {
-    const newAttachments: FileAttachment[] = Array.from(files).map(file => ({
-      file,
-      preview: URL.createObjectURL(file)
-    }));
-    setAttachments([...attachments, ...newAttachments]);
-  };
-
-  const handleRemoveAttachment = (index: number) => {
-    const newAttachments = [...attachments];
-    if (newAttachments[index]?.preview) {
-      URL.revokeObjectURL(newAttachments[index].preview!);
-    }
-    newAttachments.splice(index, 1);
-    setAttachments(newAttachments);
-  };
-
   return (
     <form onSubmit={handleSubmit} className="flex flex-col gap-2 p-4 border-t">
-      <div className="flex gap-2">
-        <FileUpload
-          onFileSelect={handleFileSelect}
-          attachments={attachments}
-          onRemoveAttachment={handleRemoveAttachment}
-        />
-        <LanguageSelector
-          value={languageMode}
-          onChange={setLanguageMode}
-        />
-      </div>
       <div className="flex gap-2">
         <Textarea
           value={message}

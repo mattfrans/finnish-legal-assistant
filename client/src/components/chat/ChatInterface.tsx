@@ -1,11 +1,19 @@
 import { useState, useEffect } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { Label } from '../ui/label';
 import { ScrollArea } from '../ui/scroll-area';
 import { InputArea } from './InputArea';
 import { FileAttachment } from '../../types';
+import { useToast } from '../../hooks/use-toast';
+
+interface Message {
+  role: 'user' | 'assistant';
+  content: string;
+  attachments?: { name: string; url: string }[];
+  sources?: string[];
+}
 
 interface ChatInterfaceProps {
   initialSessionId?: string;
@@ -14,10 +22,50 @@ interface ChatInterfaceProps {
 export function ChatInterface({ initialSessionId }: ChatInterfaceProps) {
   const [sessionId, setSessionId] = useState<string | null>(initialSessionId || null);
   const [attachments, setAttachments] = useState<FileAttachment[]>([]);
-  const [messages, setMessages] = useState([]);
+  const [messages, setMessages] = useState<Message[]>([]);
   const [languageMode, setLanguageMode] = useState('regular');
-  const [showRenameDialog, setShowRenameDialog] = useState(false);
-  const [isInitialized, setIsInitialized] = useState(false);
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+
+  const sendMessage = useMutation({
+    mutationFn: async (formData: FormData) => {
+      if (!sessionId) throw new Error("No active session");
+      const res = await fetch(`/api/chat/sessions/${sessionId}/chat`, {
+        method: "POST",
+        body: formData,
+      });
+      if (!res.ok) throw new Error("Failed to send message");
+      return res.json();
+    },
+    onMutate: (formData) => {
+      const question = formData.get('question') as string;
+      const userMessage: Message = {
+        role: "user",
+        content: question,
+        attachments: attachments.map(att => ({
+          name: att.file.name,
+          url: att.preview || ''
+        }))
+      };
+      setMessages(prev => [...prev, userMessage]);
+      setAttachments([]);
+    },
+    onSuccess: (data) => {
+      setMessages(prev => [...prev, {
+        role: "assistant",
+        content: data.answer,
+        sources: data.sources
+      }]);
+      queryClient.invalidateQueries({ queryKey: ['chat-sessions'] });
+    },
+    onError: (error) => {
+      toast({
+        title: "Error",
+        description: "Failed to send message. Please try again.",
+        variant: "destructive",
+      });
+    }
+  });
 
   const handleSubmit = async (input: string) => {
     if (!sessionId) return;
@@ -30,28 +78,14 @@ export function ChatInterface({ initialSessionId }: ChatInterfaceProps) {
       formData.append('files', att.file);
     });
 
-    await sendMessage.mutate(formData);
+    await sendMessage.mutateAsync(formData);
   };
 
   const handleFileSelect = (files: FileList) => {
-    const newFiles = Array.from(files);
-    const totalSize = newFiles.reduce((acc, file) => acc + file.size, 0);
-    const maxSize = 5 * 1024 * 1024; // 5MB
-
-    if (totalSize > maxSize) {
-      toast({
-        title: "Error",
-        description: "Total file size cannot exceed 5MB",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    const newAttachments = newFiles.map(file => ({
+    const newAttachments = Array.from(files).map((file) => ({
       file,
       preview: URL.createObjectURL(file)
     }));
-
     setAttachments(prev => [...prev, ...newAttachments]);
   };
 
@@ -64,68 +98,36 @@ export function ChatInterface({ initialSessionId }: ChatInterfaceProps) {
     setAttachments(newAttachments);
   };
 
-  const sendMessage = useQuery({
-    queryFn: async (formData: FormData) => {
-      if (!sessionId) throw new Error("No active session");
-      const res = await fetch(`/api/v1/sessions/${sessionId}/chat`, {
-        method: "POST",
-        body: formData,
-      });
-      if (!res.ok) throw new Error("Failed to send message");
-      return res.json();
-    },
-    onMutate: (formData) => {
-      const question = formData.get('question') as string;
-      const userMessage: any = {
-        role: "user",
-        content: question,
-        attachments: attachments.map(att => ({
-          filename: att.file.name,
-          contentType: att.file.type,
-          size: att.file.size,
-          type: att.file.type.startsWith('image/') ? 'image' : 'document',
-          url: att.preview
-        }))
-      };
-      setMessages(prev => [...prev, userMessage]);
-      setAttachments([]);
-    },
-    onSuccess: (data) => {
-      setMessages(prev => [...prev, {
-        role: "assistant",
-        content: data.answer,
-        sources: data.sources
-      }]);
-    },
-    onError: (error) => {
-      toast({
-        title: "Error",
-        description: "Failed to send message. Please try again.",
-        variant: "destructive",
-      });
-    }
-  });
-
-  if (!isInitialized) {
-    return <div className="flex items-center justify-center h-full">Loading...</div>;
-  }
-
   return (
     <div className="flex flex-col h-full">
       <div className="flex-1 overflow-hidden">
         <ScrollArea className="h-full">
           <div className="p-4 space-y-4">
-            {/* Chat messages will go here */}
+            {messages.map((message, index) => (
+              <div
+                key={index}
+                className={`p-4 rounded-lg ${
+                  message.role === 'user' ? 'bg-blue-100 ml-auto' : 'bg-gray-100'
+                }`}
+              >
+                <p>{message.content}</p>
+                {message.attachments && (
+                  <div className="mt-2 flex gap-2">
+                    {message.attachments.map((att, i) => (
+                      <div key={i} className="text-sm text-blue-600">
+                        {att.name}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            ))}
           </div>
         </ScrollArea>
       </div>
-      <InputArea
+      <InputArea 
         onSubmit={handleSubmit}
-        onFileSelect={handleFileSelect}
-        attachments={attachments}
-        onRemoveAttachment={handleRemoveAttachment}
-        languageMode={languageMode}
-        onLanguageChange={setLanguageMode}
+        isLoading={sendMessage.isPending}
       />
     </div>
   );
