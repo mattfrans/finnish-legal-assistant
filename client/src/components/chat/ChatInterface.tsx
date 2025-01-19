@@ -1,75 +1,37 @@
-import { useState, useEffect, useRef } from "react";
-import { useMutation, useQueryClient, useQuery } from "@tanstack/react-query";
-import { useToast } from "@/hooks/use-toast";
-import { Pencil, Pin, Trash2 } from "lucide-react";
-import { Label } from "@/components/ui/label";
-import { Input } from "@/components/ui/input";
-import { motion, AnimatePresence } from "framer-motion";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
-import { MessageList } from "./MessageList";
-import { InputArea } from "./InputArea";
-import type { Message, FileAttachment, LanguageMode, ChatSession } from "./types";
+import { useState, useEffect } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { Button } from '../ui/button';
+import { Input } from '../ui/input';
+import { Label } from '../ui/label';
+import { ScrollArea } from '../ui/scroll-area';
+import { InputArea } from './InputArea';
+import { FileAttachment } from '../../types';
 
 interface ChatInterfaceProps {
-  initialSessionId?: number;
+  initialSessionId?: string;
 }
 
 export function ChatInterface({ initialSessionId }: ChatInterfaceProps) {
-  const [messages, setMessages] = useState<Message[]>([]);
-  const [sessionId, setSessionId] = useState<number | null>(initialSessionId || null);
+  const [sessionId, setSessionId] = useState<string | null>(initialSessionId || null);
   const [attachments, setAttachments] = useState<FileAttachment[]>([]);
-  const [languageMode, setLanguageMode] = useState<LanguageMode>('regular');
+  const [messages, setMessages] = useState([]);
+  const [languageMode, setLanguageMode] = useState('regular');
   const [showRenameDialog, setShowRenameDialog] = useState(false);
   const [isInitialized, setIsInitialized] = useState(false);
-  const { toast } = useToast();
-  const queryClient = useQueryClient();
 
-  // Create a new session if none exists
-  const createSession = useMutation({
-    mutationFn: async () => {
-      const res = await fetch('/api/v1/sessions', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-      });
-      if (!res.ok) throw new Error('Failed to create session');
-      return res.json();
-    },
-    onSuccess: (data) => {
-      setSessionId(data.id);
-      setIsInitialized(true);
-    },
-    onError: (error) => {
-      toast({
-        title: "Error",
-        description: "Failed to initialize chat. Please try again.",
-        variant: "destructive",
-      });
-    },
-  });
+  const handleSubmit = async (input: string) => {
+    if (!sessionId) return;
+    
+    const formData = new FormData();
+    formData.append('question', input);
+    formData.append('languageMode', languageMode);
+    
+    attachments.forEach(att => {
+      formData.append('files', att.file);
+    });
 
-  // Initialize session
-  useEffect(() => {
-    if (!sessionId) {
-      createSession.mutate();
-    } else {
-      setIsInitialized(true);
-    }
-  }, [sessionId]);
-
-  // Cleanup URLs when component unmounts or attachments change
-  useEffect(() => {
-    return () => {
-      attachments.forEach(att => URL.revokeObjectURL(att.preview));
-    };
-  }, [attachments]);
+    await sendMessage.mutate(formData);
+  };
 
   const handleFileSelect = (files: FileList) => {
     const newFiles = Array.from(files);
@@ -93,22 +55,17 @@ export function ChatInterface({ initialSessionId }: ChatInterfaceProps) {
     setAttachments(prev => [...prev, ...newAttachments]);
   };
 
-  const handleSubmit = async (input: string) => {
-    if (!sessionId) return;
-    
-    const formData = new FormData();
-    formData.append('question', input);
-    formData.append('languageMode', languageMode);
-    
-    attachments.forEach(att => {
-      formData.append('files', att.file);
-    });
-
-    await sendMessage.mutate(formData);
+  const handleRemoveAttachment = (index: number) => {
+    const newAttachments = [...attachments];
+    if (newAttachments[index]?.preview) {
+      URL.revokeObjectURL(newAttachments[index].preview!);
+    }
+    newAttachments.splice(index, 1);
+    setAttachments(newAttachments);
   };
 
-  const sendMessage = useMutation({
-    mutationFn: async (formData: FormData) => {
+  const sendMessage = useQuery({
+    queryFn: async (formData: FormData) => {
       if (!sessionId) throw new Error("No active session");
       const res = await fetch(`/api/v1/sessions/${sessionId}/chat`, {
         method: "POST",
@@ -119,7 +76,7 @@ export function ChatInterface({ initialSessionId }: ChatInterfaceProps) {
     },
     onMutate: (formData) => {
       const question = formData.get('question') as string;
-      const userMessage: Message = {
+      const userMessage: any = {
         role: "user",
         content: question,
         attachments: attachments.map(att => ({
@@ -139,7 +96,6 @@ export function ChatInterface({ initialSessionId }: ChatInterfaceProps) {
         content: data.answer,
         sources: data.sources
       }]);
-      queryClient.invalidateQueries({ queryKey: ['sessions', sessionId] });
     },
     onError: (error) => {
       toast({
@@ -156,22 +112,20 @@ export function ChatInterface({ initialSessionId }: ChatInterfaceProps) {
 
   return (
     <div className="flex flex-col h-full">
-      <MessageList messages={messages} />
+      <div className="flex-1 overflow-hidden">
+        <ScrollArea className="h-full">
+          <div className="p-4 space-y-4">
+            {/* Chat messages will go here */}
+          </div>
+        </ScrollArea>
+      </div>
       <InputArea
         onSubmit={handleSubmit}
         onFileSelect={handleFileSelect}
         attachments={attachments}
-        onRemoveAttachment={(index) => {
-          setAttachments(prev => {
-            const newAttachments = [...prev];
-            URL.revokeObjectURL(newAttachments[index].preview);
-            newAttachments.splice(index, 1);
-            return newAttachments;
-          });
-        }}
+        onRemoveAttachment={handleRemoveAttachment}
         languageMode={languageMode}
         onLanguageChange={setLanguageMode}
-        isLoading={sendMessage.isPending}
       />
     </div>
   );

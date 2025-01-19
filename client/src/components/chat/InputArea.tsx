@@ -2,8 +2,8 @@ import React, { useState } from 'react';
 import { Send } from 'lucide-react';
 import { Button } from '../ui/button';
 import { Textarea } from '../ui/textarea';
-import FileUpload from './FileUpload';
-import LanguageSelector from './LanguageSelector';
+import { FileUpload } from './FileUpload';
+import { LanguageSelector } from './LanguageSelector';
 import { FileAttachment, LanguageMode } from '../../types';
 
 interface InputAreaProps {
@@ -11,7 +11,7 @@ interface InputAreaProps {
   isLoading?: boolean;
 }
 
-const InputArea: React.FC<InputAreaProps> = ({ onSubmit, isLoading }) => {
+export function InputArea({ onSubmit, isLoading }: InputAreaProps) {
   const [message, setMessage] = useState('');
   const [attachments, setAttachments] = useState<FileAttachment[]>([]);
   const [languageMode, setLanguageMode] = useState<LanguageMode>('finnish');
@@ -67,6 +67,4 @@ const InputArea: React.FC<InputAreaProps> = ({ onSubmit, isLoading }) => {
       </div>
     </form>
   );
-};
-
-export default InputArea;
+}
