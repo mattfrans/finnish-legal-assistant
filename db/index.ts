@@ -13,6 +13,9 @@ console.log('Initializing database connection...');
 
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
+  ssl: {
+    rejectUnauthorized: false // Required for Railway's SSL certificates
+  }
 });
 
 export const db = drizzle(pool, { schema });
