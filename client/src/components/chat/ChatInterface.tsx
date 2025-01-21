@@ -27,6 +27,31 @@ export function ChatInterface({ initialSessionId }: ChatInterfaceProps) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
+  const createSession = useMutation({
+    mutationFn: async () => {
+      const res = await fetch('/api/chat/sessions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ title: 'New Chat' }),
+      });
+      if (!res.ok) throw new Error('Failed to create session');
+      return res.json();
+    },
+    onSuccess: (data) => {
+      setSessionId(data.id);
+      queryClient.invalidateQueries({ queryKey: ['chat-sessions'] });
+    },
+    onError: () => {
+      toast({
+        title: 'Error',
+        description: 'Failed to create chat session',
+        variant: 'destructive',
+      });
+    },
+  });
+
   const sendMessage = useMutation({
     mutationFn: async (formData: FormData) => {
       if (!sessionId) throw new Error("No active session");
@@ -67,8 +92,18 @@ export function ChatInterface({ initialSessionId }: ChatInterfaceProps) {
     }
   });
 
+  useEffect(() => {
+    if (!sessionId) {
+      createSession.mutate();
+    }
+  }, [sessionId]);
+
   const handleSubmit = async (input: string) => {
-    if (!sessionId) return;
+    if (!input.trim()) return;
+    
+    if (!sessionId) {
+      await createSession.mutateAsync();
+    }
     
     const formData = new FormData();
     formData.append('question', input);
@@ -127,7 +162,7 @@ export function ChatInterface({ initialSessionId }: ChatInterfaceProps) {
       </div>
       <InputArea 
         onSubmit={handleSubmit}
-        isLoading={sendMessage.isPending}
+        isLoading={sendMessage.isPending || createSession.isPending}
       />
     </div>
   );
