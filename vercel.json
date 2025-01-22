@@ -1,11 +1,22 @@
 {
-  "buildCommand": "cd client && npm install && npm run build",
-  "outputDirectory": "client/dist",
-  "framework": "vite",
-  "rewrites": [
+  "version": 2,
+  "builds": [
     {
-      "source": "/api/:path*",
-      "destination": "https://finnish-legal-ai-production.up.railway.app/api/:path*"
+      "src": "client/package.json",
+      "use": "@vercel/static-build",
+      "config": {
+        "distDir": "dist"
+      }
+    }
+  ],
+  "routes": [
+    {
+      "src": "/api/(.*)",
+      "dest": "https://finnish-legal-ai-production.up.railway.app/api/$1"
+    },
+    {
+      "src": "/(.*)",
+      "dest": "/client/dist/$1"
     }
   ],
   "env": {
