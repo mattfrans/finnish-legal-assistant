@@ -10,12 +10,6 @@ import {
   Building
 } from "lucide-react";
 
-interface PaymentMethodSelectorProps {
-  amount: number;
-  planName: string;
-  onPaymentComplete: (success: boolean) => void;
-}
-
 const FINNISH_BANKS = [
   { id: "nordea", name: "Nordea" },
   { id: "op", name: "OP" },
@@ -28,6 +22,12 @@ const FINNISH_BANKS = [
   { id: "alandsbanken", name: "Ålandsbanken" },
   { id: "omasp", name: "OmaSp" },
 ];
+
+interface PaymentMethodSelectorProps {
+  amount: number;
+  planName: string;
+  onPaymentComplete: (success: boolean) => void;
+}
 
 export function PaymentMethodSelector({ amount, planName, onPaymentComplete }: PaymentMethodSelectorProps) {
   const [selectedMethod, setSelectedMethod] = useState<string | null>(null);
